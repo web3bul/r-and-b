@@ -298,3 +298,24 @@ p { margin: 0; line-height: 1.45; }
 .bubble.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
 .bubble small { display: block; font-weight: 500; color: #a0569b; font-size: 12px; margin-bottom: 2px; }
 .taunt.sent { background: var(--green); border-color: var(--green); color: #fff; }
+
+/* ---------- v2.1: guess clock + live typing ---------- */
+.board-meta { gap: 10px; }
+.board-meta #bFor { flex: 1; }
+.timer {
+  --p: 1;
+  position: relative; min-width: 54px; height: 34px; padding: 0 12px; border-radius: 999px;
+  display: grid; place-items: center; font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums;
+  background: conic-gradient(var(--green) calc(var(--p) * 360deg), rgba(255,255,255,.14) 0);
+}
+.timer::before { content: ""; position: absolute; inset: 3px; border-radius: 999px; background: #4a1a62; }
+.timer { isolation: isolate; }
+.timer::before { z-index: -1; }
+.timer.urgent { background: conic-gradient(#ff5d6c calc(var(--p) * 360deg), rgba(255,255,255,.14) 0); color: #ffd1d6; animation: pulse .5s ease-in-out infinite; }
+.tile.burned { background: rgba(0,0,0,.25); box-shadow: none; border: 2px dashed rgba(255,255,255,.18); }
+
+.live-head { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.live-timer { font-weight: 700; font-size: 14px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.16); font-variant-numeric: tabular-nums; }
+.live-timer.urgent { background: #ff5d6c; color: #fff; }
+.mini { width: 30px; height: 30px; display: grid; place-items: center; font-size: 15px; font-weight: 700; text-transform: uppercase; }
+.mini.typing { background: rgba(255,255,255,.28); border: 2px solid rgba(255,255,255,.7); }
