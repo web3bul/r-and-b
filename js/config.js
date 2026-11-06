@@ -8,6 +8,7 @@ window.RB_CONFIG = {
   POINTS_TO_WIN: 30,
   STUMP_BONUS: 2,
   MAX_GUESSES: 6,
+  GUESS_SECONDS: 15, // time allowed for each guess; when it runs out, that guess is lost
 
   // Firebase project (safe to be public: it identifies the project, it isn't a password)
   FIREBASE: {

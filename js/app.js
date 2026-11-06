@@ -133,6 +133,10 @@
     $("#btnBack").hidden = !canBack;
     if (tg && tg.BackButton) { try { canBack ? tg.BackButton.show() : tg.BackButton.hide(); } catch (e) {} }
     if (id !== "set" && id !== "board") activeKeyHandler = null;
+    if (id !== "board" && clockTimer) {
+      stopClock(); clearTimeout(typingTimer);
+      if (G && G.phase === "guessing" && guesser() === me) NET.patch(gameId, { typing: "", deadline: 0 }).catch(function () {});
+    }
     window.scrollTo(0, 0);
   }
   function goHome() { renderHome(); show("home"); }
@@ -237,27 +241,46 @@
       }
     }
   }
-  var liveCount = 0;
+  var liveCount = 0, liveTyped = "";
   function renderLive() {
     var live = $("#liveCard"), grid = $("#liveGrid");
     live.hidden = false;
-    var rows = G.guesses || [];
-    $("#liveTitle").textContent = rows.length
-      ? partnerName() + " has used " + rows.length + " of " + CFG.MAX_GUESSES + " guesses" + ((G.hints || []).length ? " (+" + G.hints.length + " hint)" : "")
-      : partnerName() + " is thinking… 🤔";
+    var rows = G.guesses || [], typing = (G.typing || "").slice(0, 5);
+    $("#liveTitle").textContent = typing
+      ? partnerName() + " is typing… ✍️"
+      : rows.length
+        ? partnerName() + " has used " + rows.length + " of " + CFG.MAX_GUESSES + " guesses" + ((G.hints || []).length ? " (+" + G.hints.length + " hint)" : "")
+        : partnerName() + " is thinking… 🤔";
     grid.innerHTML = "";
     for (var r = 0; r < CFG.MAX_GUESSES; r++) {
       var row = document.createElement("div"); row.className = "mini-row";
       var res = rows[r] ? scoreGuess(rows[r], G.word) : null;
       for (var c = 0; c < 5; c++) {
         var m = document.createElement("div"); m.className = "mini" + (res ? " " + res[c] : "");
-        if (res && r >= liveCount) m.classList.add("pop");
+        if (res) {
+          m.textContent = rows[r][c] === "." ? "" : rows[r][c];
+          if (r >= liveCount) m.classList.add("pop");
+        } else if (r === rows.length && typing[c]) {
+          m.textContent = typing[c]; m.classList.add("typing");
+          if (c >= liveTyped.length) m.classList.add("pop");
+        }
         row.appendChild(m);
       }
       grid.appendChild(row);
     }
-    liveCount = rows.length;
+    liveCount = rows.length; liveTyped = typing;
+    tickLiveClock();
   }
+  // Countdown shown on the watcher's screen, driven by the guesser's deadline.
+  function tickLiveClock() {
+    var el = $("#liveTimer");
+    if (!G || G.phase !== "guessing" || guesser() === me || !G.deadline || $("#liveCard").hidden) { el.hidden = true; return; }
+    var left = Math.ceil((G.deadline - Date.now()) / 1000);
+    if (left < 0 || left > CFG.GUESS_SECONDS + 2) { el.hidden = true; return; }
+    el.hidden = false; el.textContent = "⏱ " + left + "s";
+    el.classList.toggle("urgent", left <= 5);
+  }
+  setInterval(function () { if (screen === "home" && G) tickLiveClock(); }, 250);
   function mainAction() {
     if (!G) return;
     if (G.phase === "setting" && G.setter === me) startSet();
@@ -473,6 +496,48 @@
     buildKeyboard($("#kbBoard"), onBoardKey);
     renderBoard(); show("board");
     activeKeyHandler = onBoardKey;
+    startClock();
+  }
+
+  /* ---------- guess clock ---------- */
+  var clockTimer = null, deadline = 0, lastTickSec = -1;
+  function startClock() {
+    stopClock();
+    deadline = Date.now() + CFG.GUESS_SECONDS * 1000; lastTickSec = -1;
+    patch({ deadline: deadline, typing: "" });
+    renderClock();
+    clockTimer = setInterval(renderClock, 200);
+  }
+  function stopClock() {
+    if (clockTimer) clearInterval(clockTimer);
+    clockTimer = null;
+  }
+  function renderClock() {
+    var left = Math.max(0, deadline - Date.now()), sec = Math.ceil(left / 1000);
+    var el = $("#timer");
+    el.textContent = sec + "s";
+    el.style.setProperty("--p", (left / (CFG.GUESS_SECONDS * 1000)).toFixed(3));
+    el.classList.toggle("urgent", sec <= 5);
+    if (sec <= 5 && sec > 0 && sec !== lastTickSec) { lastTickSec = sec; beep(sec <= 3 ? 990 : 660, 0.05, "square", 0.04); if (sec <= 3) haptic("light"); }
+    if (left <= 0) { stopClock(); timeUp(); }
+  }
+  function timeUp() {
+    if (screen !== "board" || !G || G.phase !== "guessing" || guesser() !== me) return;
+    if (locked) { setTimeout(timeUp, 300); return; }
+    var rows = (G.guesses || []).concat(["....."]), rowIdx = rows.length - 1;
+    G.guesses = rows; cur = "";
+    toast("⏱ Time's up! That guess is gone"); sfx.bad(); haptic("warning");
+    locked = true; renderBoard(rowIdx);
+    var out = rows.length >= CFG.MAX_GUESSES;
+    if (!out) patch({ guesses: rows, typing: "" });
+    setTimeout(function () { locked = false; if (out) finish(false); else startClock(); }, 900);
+  }
+
+  /* ---------- live typing (so the other player can watch) ---------- */
+  var typingTimer = null;
+  function sendTyping() {
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(function () { if (screen === "board") NET.patch(gameId, { typing: cur }).catch(function () {}); }, 120);
   }
   function renderBoard(animateRow) {
     var rows = G.guesses || [], hints = G.hints || [], grid = $("#grid"); grid.innerHTML = "";
@@ -482,7 +547,8 @@
       for (var c = 0; c < 5; c++) {
         var t = document.createElement("div"); t.className = "tile";
         if (done) {
-          t.textContent = done[c];
+          t.textContent = done[c] === "." ? "" : done[c];
+          if (done === ".....") t.classList.add("burned");
           if (r === animateRow) {
             (function (tile, cls, delay) {
               tile.style.animationDelay = delay + "ms"; tile.classList.add("flip");
@@ -513,9 +579,9 @@
   }
   function onBoardKey(k) {
     if (locked || !G || G.phase !== "guessing" || guesser() !== me) return;
-    if (k === "back") { cur = cur.slice(0, -1); sfx.key(); renderBoard(); return; }
+    if (k === "back") { cur = cur.slice(0, -1); sfx.key(); renderBoard(); sendTyping(); return; }
     if (k === "enter") return submitGuess();
-    if (cur.length < 5) { cur += k; sfx.key(); haptic("light"); renderBoard(); }
+    if (cur.length < 5) { cur += k; sfx.key(); haptic("light"); renderBoard(); sendTyping(); }
   }
   function shakeRow(msg) {
     var rows = document.querySelectorAll("#grid .row"), row = rows[(G.guesses || []).length];
@@ -526,14 +592,15 @@
     if (cur.length < 5) return shakeRow("Not enough letters");
     if (!VALID.has(cur)) return shakeRow("Not in the word list");
     var rows = (G.guesses || []).concat([cur]), guess = cur, rowIdx = rows.length - 1;
-    G.guesses = rows; cur = "";
-    locked = true; renderBoard(rowIdx);
+    G.guesses = rows; cur = ""; clearTimeout(typingTimer);
+    stopClock(); locked = true; renderBoard(rowIdx);
     var solved = guess === G.word, out = rows.length >= CFG.MAX_GUESSES;
-    if (!solved && !out) patch({ guesses: rows });
+    if (!solved && !out) patch({ guesses: rows, typing: "" });
     setTimeout(function () {
       locked = false;
       if (solved) { var rs = document.querySelectorAll("#grid .row"); rs[rowIdx].classList.add("win"); finish(true); }
       else if (out) finish(false);
+      else if (screen === "board") startClock();
     }, 1050);
   }
   function useHint() {
@@ -550,6 +617,7 @@
     renderBoard();
   }
   function finish(solved) {
+    stopClock(); clearTimeout(typingTimer);
     var setter = G.setter, rows = G.guesses || [], hints = G.hints || [];
     var tries = solved ? rows.length : 0;
     var pts = solved ? Math.max(0, CFG.MAX_GUESSES + 1 - tries - hints.length) : 0;
@@ -564,7 +632,8 @@
     sentTaunt = false;
     patch({
       s: s, r: r, last: { g: me, w: word, t: tries, p: pts, rw: rw, at: now }, history: hist,
-      phase: "setting", setter: me, word: "", clue: "", guesses: [], hints: [], t: G.t + 1
+      phase: "setting", setter: me, word: "", clue: "", guesses: [], hints: [], t: G.t + 1,
+      typing: "", deadline: 0
     }).then(function () {
       notify({ type: "result", w: word, t: tries, p: pts, rw: rw < 0 ? "" : (rw === me ? "sender" : "you") });
     });

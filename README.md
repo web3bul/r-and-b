@@ -7,6 +7,7 @@ One player sets a secret five-letter word, and the other gets six guesses to fin
 ## Rules
 - Points for solving: 6 for 1 guess, 5 for 2, and so on down to 1 for 6 guesses.
 - If the guesser misses, the setter gets +2 for stumping them.
+- Each guess has a 15-second clock. If it runs out, that guess is lost (change `GUESS_SECONDS` in `js/config.js`).
 - A hint reveals one letter and costs 1 point.
 - When you set a word, you can add a clue or tap **Surprise me** for a random word with an automatic clue.
 - After each result, you can send a taunt, and your partner sees it straight away.
@@ -14,7 +15,7 @@ One player sets a secret five-letter word, and the other gets six guesses to fin
 ## How it works
 - **Live game**: both phones share one game stored in Firebase (Firestore), so turns, guesses, taunts and scores update instantly.
 - **Invite once**: the creator sends a single invite link. After that, both players just open the game from the bot.
-- **Live tracker**: while your partner guesses your word, you can watch their coloured squares fill in, without the letters.
+- **Live tracker**: while your partner guesses your word, you can watch them type each letter, see their colours and see their countdown.
 - **Bot pings**: if your partner isn't in the app, the bot messages them in Telegram with a Play button.
 - **Free to run**: it uses Firebase's free Spark plan and Vercel's free plan.
 
