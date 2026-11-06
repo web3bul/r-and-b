@@ -22,6 +22,14 @@
   </header>
 
   <main>
+    <!-- LOADING -->
+    <section class="screen active" id="loading">
+      <div class="card center">
+        <div class="hero-tiles"><span class="t g">R</span><span class="t y">&amp;</span><span class="t g">B</span></div>
+        <p class="muted" id="loadingMsg">Connecting…</p>
+      </div>
+    </section>
+
     <!-- HOME -->
     <section class="screen" id="home">
       <div id="homeEmpty" class="card hero">
@@ -36,14 +44,14 @@
       <div id="homeGame" hidden>
         <div class="card scorecard">
           <div class="player">
-            <div class="avatar" id="avA">B</div>
+            <div class="avatar" id="avA">B<i class="dot" id="dotA"></i></div>
             <div class="pname" id="nameA">You</div>
             <div class="rounds"><span id="roundsA">0</span> rounds</div>
           </div>
           <div class="vs">vs</div>
           <div class="player">
-            <div class="avatar her" id="avB">H</div>
-            <div class="pname" id="nameB">Her</div>
+            <div class="avatar her" id="avB">?<i class="dot" id="dotB"></i></div>
+            <div class="pname" id="nameB">Partner</div>
             <div class="rounds"><span id="roundsB">0</span> rounds</div>
           </div>
           <div class="bars">
@@ -55,9 +63,21 @@
 
         <div class="status-pill" id="status">Your turn!</div>
 
-        <button class="btn primary big" id="btnTakeTurns">
+        <div class="card live-card" id="liveCard" hidden>
+          <div class="live-title" id="liveTitle">Reye is guessing your word</div>
+          <div class="mini-grid" id="liveGrid"></div>
+        </div>
+
+        <div class="last-line" id="lastLine" hidden></div>
+
+        <button class="btn primary big" id="btnInvite" hidden>
+          <span class="btn-emoji">&#128140;</span>
+          <span><b>Invite your partner</b><small>Send this once. After that it's all live.</small></span>
+        </button>
+
+        <button class="btn primary big" id="btnMain">
           <span class="btn-emoji">&#128172;</span>
-          <span><b>Take Turns</b><small id="ttHint">Set a word for her</small></span>
+          <span><b id="mainTitle">Take Turns</b><small id="mainSub">Set a word</small></span>
         </button>
         <button class="btn ghost big" id="btnDuel" disabled>
           <span class="btn-emoji">&#9889;</span>
@@ -66,7 +86,6 @@
 
         <div class="row-btns">
           <button class="btn soft" id="btnScore">&#127942; Scoreboard</button>
-          <button class="btn soft" id="btnResend" hidden>&#128228; Resend link</button>
         </div>
         <button class="link-btn" id="btnNew">Start a brand new game</button>
       </div>
@@ -75,14 +94,25 @@
     <!-- SETUP -->
     <section class="screen" id="setup">
       <div class="card">
-        <h2>Who's playing?</h2>
+        <h2>What's your name?</h2>
+        <p class="muted setup-note">You'll invite your partner right after.</p>
         <label class="field">Your name
           <input id="inMe" maxlength="12" placeholder="Ben" autocomplete="off">
         </label>
-        <label class="field">Your partner's name
-          <input id="inThem" maxlength="12" placeholder="Babe" autocomplete="off">
+        <button class="btn primary big" id="btnSetupGo">Create game</button>
+      </div>
+    </section>
+
+    <!-- JOIN -->
+    <section class="screen" id="join">
+      <div class="card center">
+        <div class="big-emoji">&#128140;</div>
+        <h2 id="joinTitle">You're invited!</h2>
+        <p class="muted" id="joinNote"></p>
+        <label class="field full">Your name
+          <input id="inJoinName" maxlength="12" placeholder="Reye" autocomplete="off">
         </label>
-        <button class="btn primary big" id="btnSetupGo">Next: set a word</button>
+        <button class="btn primary big" id="btnJoin">Join game</button>
       </div>
     </section>
 
@@ -100,18 +130,6 @@
       </label>
       <button class="btn primary big" id="btnSend" disabled>Send it &#128140;</button>
       <div class="keyboard" id="kbSet"></div>
-    </section>
-
-    <!-- INCOMING -->
-    <section class="screen" id="incoming">
-      <div class="card center">
-        <div class="big-emoji">&#128140;</div>
-        <h2 id="inTitle">Ben set you a word!</h2>
-        <div id="inLast" class="last-card" hidden></div>
-        <div id="inTaunt" class="taunt-bubble" hidden></div>
-        <div id="incClue" class="clue-banner" hidden></div>
-        <button class="btn primary big" id="btnPlay">Let's play</button>
-      </div>
     </section>
 
     <!-- BOARD -->
@@ -138,7 +156,7 @@
         <div class="tally" id="rTally"></div>
       </div>
       <div class="card">
-        <h3>Send a taunt <small class="muted">(optional)</small></h3>
+        <h3>Send a taunt <small class="muted">(they'll see it instantly)</small></h3>
         <div class="taunts" id="taunts"></div>
       </div>
       <button class="btn primary big" id="btnNext">Your turn: set a word</button>
@@ -156,10 +174,13 @@
   </main>
 
   <div class="toast" id="toast"></div>
+  <div class="bubble" id="bubble"></div>
 
   <script src="js/config.js"></script>
   <script src="js/answers.js"></script>
   <script src="js/valid.js"></script>
+  <script src="js/mock.js"></script>
+  <script src="js/net.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
