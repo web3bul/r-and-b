@@ -1,7 +1,10 @@
-// Builds the site into dist/ and generates js/valid.js (all accepted guesses)
-// from the word-list package plus the words in js/answers.js.
+// Builds the site into dist/:
+//  - copies the page, styles and scripts
+//  - bundles the Firebase SDK into js/net.js
+//  - generates js/valid.js (all accepted guesses) from the word-list package
 const fs = require("fs");
 const path = require("path");
+const esbuild = require("esbuild");
 
 const root = path.join(__dirname, "..");
 const dist = path.join(root, "dist");
@@ -12,20 +15,31 @@ fs.mkdirSync(path.join(dist, "css"), { recursive: true });
 
 fs.copyFileSync(path.join(root, "index.html"), path.join(dist, "index.html"));
 fs.copyFileSync(path.join(root, "css/style.css"), path.join(dist, "css/style.css"));
-for (const f of ["app.js", "answers.js", "config.js"]) {
+for (const f of ["app.js", "answers.js", "config.js", "mock.js"]) {
   fs.copyFileSync(path.join(root, "js", f), path.join(dist, "js", f));
 }
 
+esbuild.buildSync({
+  entryPoints: [path.join(root, "js/firebase-entry.js")],
+  bundle: true,
+  minify: true,
+  format: "iife",
+  target: "es2020",
+  outfile: path.join(dist, "js/net.js"),
+  logLevel: "warning"
+});
+fs.copyFileSync(path.join(dist, "js/net.js"), path.join(root, "js/net.js")); // handy for local testing
+
 const wordsFile = require.resolve("word-list/words.txt");
 const words = fs.readFileSync(wordsFile, "utf8").split("\n").filter((w) => /^[a-z]{5}$/.test(w));
-
 global.window = {};
 eval(fs.readFileSync(path.join(root, "js/answers.js"), "utf8"));
 const all = new Set(words);
 window.RB_ANSWERS.forEach((a) => all.add(a.w));
-
 const list = [...all].sort();
 const out = "// All five-letter words accepted as guesses (generated at build time).\nwindow.RB_VALID=\"" + list.join(" ") + "\".split(\" \");\n";
 fs.writeFileSync(path.join(dist, "js/valid.js"), out);
-fs.writeFileSync(path.join(root, "js/valid.js"), out); // handy for local testing
-console.log("Built dist/ with " + list.length + " valid words and " + window.RB_ANSWERS.length + " surprise words.");
+fs.writeFileSync(path.join(root, "js/valid.js"), out);
+
+const kb = (f) => Math.round(fs.statSync(path.join(dist, f)).size / 1024) + " KB";
+console.log("Built dist/: " + list.length + " valid words, " + window.RB_ANSWERS.length + " surprise words, net.js " + kb("js/net.js"));

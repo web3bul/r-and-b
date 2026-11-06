@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // One document per game. Only the two players can read or change it.
+    match /games/{gameId} {
+      allow read: if request.auth != null
+                  && request.auth.uid in resource.data.uids;
+
+      // Creating a game: you must be its only player.
+      allow create: if request.auth != null
+                    && request.resource.data.uids == [request.auth.uid];
+
+      allow update: if request.auth != null && (
+        // Players can update their own game.
+        request.auth.uid in resource.data.uids
+        ||
+        // Joining: only when one seat is free, adding only yourself.
+        (resource.data.uids.size() == 1
+          && request.resource.data.uids == resource.data.uids.concat([request.auth.uid])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uids', 'players', 'seen']))
+      );
+
+      allow delete: if false;
+    }
+  }
+}

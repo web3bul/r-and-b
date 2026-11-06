@@ -1,6 +1,6 @@
 {
   "name": "r-and-b",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "R & B, a Wordle-style word game for two, played as a Telegram Mini App",
   "scripts": {
@@ -8,5 +8,9 @@
   },
   "dependencies": {
     "word-list": "2.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "firebase": "13.2.0"
   }
 }
