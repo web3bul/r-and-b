@@ -5,8 +5,8 @@
 //   BOT_USERNAME = "RnBWordBot" and APP_SHORT_NAME = "play".
 // If left empty, links open the game in a normal browser instead.
 window.RB_CONFIG = {
-  BOT_USERNAME: "",
-  APP_SHORT_NAME: "",
+  BOT_USERNAME: "RandB_game_Bot",
+  APP_SHORT_NAME: "play",
   POINTS_TO_WIN: 30,
   STUMP_BONUS: 2,
   MAX_GUESSES: 6
