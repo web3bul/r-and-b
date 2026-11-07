@@ -446,3 +446,6 @@ html.tiny .mini-grid.feed, html.tiny .mini-grid.feed .mini-row { gap: 2px; }
 .tile.known-slot { border: 2px dashed rgba(47,210,122,.75); }
 .tile.known-slot .hl { color: var(--green); opacity: .55; }
 .tile.filled.known { background: var(--green); border-color: transparent; box-shadow: inset 0 -5px 0 var(--green-d); }
+
+/* ---------- v2.7: bot difficulty ---------- */
+.solo-btns { display: flex; gap: 6px; }

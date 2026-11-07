@@ -12,7 +12,7 @@ One player sets a secret word of 3 to 5 letters, and the other gets six guesses 
 - **Forfeits**: whoever wins a round spins the forfeit wheel (3 spins, or write your own) and the loser has to do it, then taps "I did it ✅". Edit the list in `FORFEITS` in `js/config.js`.
 - Secret words can be 3, 4 or 5 letters (set `MIN_LEN` / `MAX_LEN` in `js/config.js`). Type 3 or 4 letters and tap Send, or keep typing to 5.
 - **Live Duel ⚡**: challenge your partner to a real-time race with a 3-2-1 countdown. Pick **Same word** (the game picks one word and you both race) or **Each other's words** (you each set one, then race). You watch their guesses live (letters, colours, what they're typing, and any not-a-word slips). First to solve wins; if nobody does, the closest guess wins. Duel wins get their own line on the scoreboard, and you can make the loser spin the forfeit wheel.
-- **Solo mode**: play against the R&B Bot. It sets you words with clues, then guesses yours live while you watch. If it wins a round, it gives you a dare. Everything stays on your phone.
+- **Solo mode**: play against the R&B Bot. It sets you words with clues, then guesses yours live while you watch. If it wins a round, it gives you a dare. Everything stays on your phone. The bot never sees your word, only the colours of its own guesses, and it plays like a person (it sometimes misses a clue). Tap the level button to switch between Easy, Normal and Hard.
 - A hint reveals one letter and costs 1 point.
 - Letters you've already found in the right spot show up faintly in your next row, and turn green as you type them there.
 - If the clock runs out while a complete word is typed, it counts as sent.
