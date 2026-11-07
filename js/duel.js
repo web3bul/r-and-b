@@ -206,13 +206,16 @@ window.RBDuel = function (A) {
     var cb = $("#dClue"), clue = myClue(d); cb.hidden = !clue; cb.textContent = "Clue: " + clue;
     // My grid
     var grid = $("#dGrid"); grid.innerHTML = ""; grid.style.setProperty("--cols", L);
+    var known = {}; // letters already found in the right spot
+    if (word) rows.forEach(function (g) { if (A.isBurned(g)) return; A.scoreGuess(g, word).forEach(function (x, i) { if (x === "g") known[i] = word[i]; }); });
     for (var r = 0; r < CFG.MAX_GUESSES; r++) {
       var row = document.createElement("div"); row.className = "row";
       var done = rows[r], res = done && word ? A.scoreGuess(done, word) : null;
       for (var c = 0; c < L; c++) {
         var t = document.createElement("div"); t.className = "tile";
         if (done) { t.textContent = done[c] === "." ? "" : done[c]; t.classList.add(res[c]); if (A.isBurned(done)) t.classList.add("burned"); }
-        else if (r === rows.length && cur[c]) { t.textContent = cur[c]; t.classList.add("filled"); }
+        else if (r === rows.length && cur[c]) { t.textContent = cur[c]; t.classList.add("filled"); if (known[c] && cur[c] === known[c]) t.classList.add("known"); }
+        else if (r === rows.length && known[c]) { t.classList.add("known-slot"); t.innerHTML = '<span class="hl">' + known[c] + "</span>"; }
         row.appendChild(t);
       }
       grid.appendChild(row);
@@ -339,6 +342,7 @@ window.RBDuel = function (A) {
     if (left <= 0) {
       stopClock();
       var d = D(); if (!live || !d || finOf(d, me()) || d.state === "done") return;
+      if (cur.length === myWord(d).length && A.VALID.has(cur)) { addRow(cur); return; } // a full word on the board counts
       A.toast("⏱ Time's up! That guess is gone");
       addRow(new Array(myWord(d).length + 1).join("."));
     }

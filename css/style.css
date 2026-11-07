@@ -441,3 +441,8 @@ html.tiny .btn.chip { padding: 5px 10px; }
 .mini-grid.feed .mini.typing { border-width: 1.5px; }
 html.tiny .mini-grid.feed .mini { width: 16px; height: 16px; font-size: 10px; }
 html.tiny .mini-grid.feed, html.tiny .mini-grid.feed .mini-row { gap: 2px; }
+
+/* ---------- v2.6: letters you've already got green ---------- */
+.tile.known-slot { border: 2px dashed rgba(47,210,122,.75); }
+.tile.known-slot .hl { color: var(--green); opacity: .55; }
+.tile.filled.known { background: var(--green); border-color: transparent; box-shadow: inset 0 -5px 0 var(--green-d); }

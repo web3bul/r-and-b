@@ -640,13 +640,15 @@
   function timeUp() {
     if (screen !== "board" || !G || G.phase !== "guessing" || guesser() !== me) return;
     if (locked) { setTimeout(timeUp, 300); return; }
+    // If a full, real word is already typed when the clock hits zero, count it as sent.
+    if (cur.length === wordLen() && VALID.has(cur)) { submitGuess(); return; }
     var rows = (G.guesses || []).concat([new Array(wordLen() + 1).join(".")]), rowIdx = rows.length - 1;
     G.guesses = rows; cur = "";
     toast("⏱ Time's up! That guess is gone"); sfx.bad(); haptic("warning");
     locked = true; renderBoard(rowIdx);
     var out = rows.length >= CFG.MAX_GUESSES;
     if (!out) patch({ guesses: rows, typing: "" });
-    setTimeout(function () { locked = false; if (out) finish(false); else startClock(); }, 900);
+    setTimeout(function () { locked = false; if (out) finish(false, rows); else startClock(); }, 900);
   }
 
   /* ---------- live typing (so the other player can watch) ---------- */
@@ -655,8 +657,16 @@
     clearTimeout(typingTimer);
     typingTimer = setTimeout(function () { if (screen === "board") NET.patch(gameId, { typing: cur }).catch(function () {}); }, 120);
   }
+  // Letters already found in the right spot (from earlier guesses or hints): position -> letter.
+  function knownGreens(rows, word, hints) {
+    var k = {};
+    rows.forEach(function (g) { if (isBurned(g)) return; scoreGuess(g, word).forEach(function (r, i) { if (r === "g") k[i] = word[i]; }); });
+    (hints || []).forEach(function (i) { k[i] = word[i]; });
+    return k;
+  }
   function renderBoard(animateRow) {
     var L = wordLen(), rows = G.guesses || [], hints = G.hints || [], grid = $("#grid"); grid.innerHTML = "";
+    var known = knownGreens(rows, G.word, hints);
     grid.style.setProperty("--cols", L);
     for (var r = 0; r < CFG.MAX_GUESSES; r++) {
       var row = document.createElement("div"); row.className = "row";
@@ -673,8 +683,8 @@
             })(t, res[c], c * 160);
           } else t.classList.add(res[c]);
         } else if (r === rows.length) {
-          if (cur[c]) { t.textContent = cur[c]; t.classList.add("filled"); }
-          else if (hints.indexOf(c) >= 0) { t.classList.add("hint-slot"); t.innerHTML = '<span class="hl">' + G.word[c] + "</span>"; }
+          if (cur[c]) { t.textContent = cur[c]; t.classList.add("filled"); if (known[c] && cur[c] === known[c]) t.classList.add("known"); }
+          else if (known[c]) { t.classList.add("known-slot"); t.innerHTML = '<span class="hl">' + known[c] + "</span>"; }
         }
         row.appendChild(t);
       }
@@ -737,8 +747,8 @@
     if (!solved && !out) patch({ guesses: rows, typing: "" });
     setTimeout(function () {
       locked = false;
-      if (solved) { var rs = document.querySelectorAll("#grid .row"); rs[rowIdx].classList.add("win"); finish(true); }
-      else if (out) finish(false);
+      if (solved) { var rs = document.querySelectorAll("#grid .row"); rs[rowIdx].classList.add("win"); finish(true, rows); }
+      else if (out) finish(false, rows);
       else if (screen === "board") startClock();
     }, 1050);
   }
@@ -755,9 +765,12 @@
     toast("Letter " + (pick + 1) + " revealed (-1 point)");
     renderBoard();
   }
-  function finish(solved) {
+  // rows comes from the guess that just ended: a live update from the other phone can
+  // land during the flip animation and replace G with a copy that doesn't have it yet.
+  function finish(solved, rows) {
     stopClock(); clearTimeout(typingTimer);
-    var setter = G.setter, rows = G.guesses || [], hints = G.hints || [];
+    rows = rows || G.guesses || [];
+    var setter = G.setter, hints = G.hints || [];
     var tries = solved ? rows.length : 0;
     var pts = solved ? Math.max(0, CFG.MAX_GUESSES + 1 - tries - hints.length) : 0;
     var s = G.s.slice(), r = G.r.slice();
@@ -767,7 +780,7 @@
     if (rw >= 0) { r[rw]++; s = [0, 0]; }
     var now = Date.now(), word = G.word;
     var hist = [{ w: word, g: me, t: tries, p: pts, at: now }].concat(G.history || []).slice(0, 40);
-    localResult = { w: word, t: tries, p: pts, h: hints.length, rw: rw, s: s };
+    localResult = { w: word, t: tries, p: pts, h: hints.length, rw: rw, s: s, solved: solved };
     sentTaunt = false;
     var fields = {
       s: s, r: r, last: { g: me, w: word, t: tries, p: pts, rw: rw, at: now }, history: hist,
@@ -785,7 +798,7 @@
   /* ---------- RESULT ---------- */
   function showResult() {
     var l = localResult; if (!l) return goHome();
-    var solved = l.t > 0;
+    var solved = l.solved != null ? l.solved : l.t > 0;
     $("#rTitle").textContent = solved ? (l.t <= 2 ? "Genius! 🤯" : l.t <= 4 ? "You got it! 🎉" : "Phew, close one! 😅") : "So close… 💔";
     var wr = $("#rWord"); wr.innerHTML = ""; wr.style.setProperty("--cols", l.w.length);
     l.w.split("").forEach(function (ch, i) {
