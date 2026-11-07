@@ -38,6 +38,8 @@ function buildText(b, name) {
       const f = cleanText(b.text);
       return f ? "😈 " + name + " won the round and picked your forfeit:\n\n" + f + "\n\nTap \"I did it\" in the game when it's done." : null;
     }
+    case "duel":
+      return "⚡ " + name + " challenged you to a Live Duel" + (b.mode === "each" ? " (each other's words)" : " (same word)") + "!\nOpen the game to accept.";
     case "forfeit_done": {
       const f = cleanText(b.text);
       return f ? "✅ " + name + " says they did their forfeit:\n" + f : null;

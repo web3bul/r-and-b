@@ -15,7 +15,7 @@ fs.mkdirSync(path.join(dist, "css"), { recursive: true });
 
 fs.copyFileSync(path.join(root, "index.html"), path.join(dist, "index.html"));
 fs.copyFileSync(path.join(root, "css/style.css"), path.join(dist, "css/style.css"));
-for (const f of ["app.js", "answers.js", "config.js", "mock.js"]) {
+for (const f of ["app.js", "duel.js", "answers.js", "config.js", "mock.js"]) {
   fs.copyFileSync(path.join(root, "js", f), path.join(dist, "js", f));
 }
 
