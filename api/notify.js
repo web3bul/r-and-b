@@ -9,6 +9,10 @@ function cleanName(s) {
   return String(s || "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 20) || "Your partner";
 }
 
+function cleanText(s) {
+  return String(s || "").replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, 100);
+}
+
 function buildText(b, name) {
   const word = /^[a-z]{5}$/.test(String(b.w || "")) ? String(b.w).toUpperCase() : "";
   const tries = Number(b.t), pts = Number(b.p);
@@ -29,6 +33,14 @@ function buildText(b, name) {
     case "taunt": {
       const t = TAUNTS[Number(b.i)];
       return t ? "💬 " + name + ": " + t : null;
+    }
+    case "forfeit": {
+      const f = cleanText(b.text);
+      return f ? "😈 " + name + " won the round and picked your forfeit:\n\n" + f + "\n\nTap \"I did it\" in the game when it's done." : null;
+    }
+    case "forfeit_done": {
+      const f = cleanText(b.text);
+      return f ? "✅ " + name + " says they did their forfeit:\n" + f : null;
     }
     default:
       return null;

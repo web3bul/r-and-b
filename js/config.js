@@ -9,6 +9,31 @@ window.RB_CONFIG = {
   STUMP_BONUS: 2,
   MAX_GUESSES: 6,
   GUESS_SECONDS: 15, // time allowed for each guess; when it runs out, that guess is lost
+  FORFEIT_SPINS: 3,  // the round winner gets this many spins before locking a forfeit in
+
+  // Forfeits the round loser has to do. Add, remove or edit freely.
+  FORFEITS: [
+    "Send the winner ₦500 💸",
+    "Send the winner ₦1,000 💸",
+    "Post the winner's picture on your status with a sweet caption 📸",
+    "Buy the winner their favourite snack 🍫",
+    "Treat the winner to suya 🍢",
+    "Cook the winner's favourite meal 🍲",
+    "Wash the dishes next time 🍽️",
+    "Do one chore of the winner's choice 🧹",
+    "Give the winner a 10-minute massage 💆",
+    "Write the winner a 3-line love poem ✍️",
+    "Send a voice note singing the winner's favourite song 🎤",
+    "Send 5 genuine compliments right now 💌",
+    "Plan the next date night 🌙",
+    "Let the winner pick the next movie 🎬",
+    "Send your silliest selfie 🤪",
+    "Use a profile picture the winner chooses for 24 hours 🤳",
+    "Dance for 30 seconds on a video call 💃",
+    "Bring the winner breakfast in bed ☕",
+    "Say \"You're the smartest person I know\" in a voice note 🧠",
+    "Give the winner a big hug and 10 kisses 😘"
+  ],
 
   // Firebase project (safe to be public: it identifies the project, it isn't a password)
   FIREBASE: {
