@@ -37,11 +37,19 @@
           <span class="t g">R</span><span class="t y">&amp;</span><span class="t g">B</span>
         </div>
         <h1>A word game for two</h1>
-        <p class="muted">Set a secret five-letter word. Your partner gets six guesses. First to <b class="ptw">30</b> points wins the round.</p>
-        <button class="btn primary big" id="btnStart">Start a game</button>
+        <p class="muted">Set a secret word of 3 to 5 letters. Your partner gets six guesses. First to <b class="ptw">30</b> points wins the round.</p>
+        <button class="btn primary big" id="btnStart">Play with your partner</button>
+        <button class="btn ghost big" id="btnSolo1">
+          <span class="btn-emoji">&#129302;</span>
+          <span><b>Play solo</b><small>Take on the R&amp;B Bot</small></span>
+        </button>
       </div>
 
       <div id="homeGame" hidden>
+        <div class="solo-bar" id="soloBar" hidden>
+          <span>&#129302; Solo game vs the bot</span>
+          <button class="btn chip" id="btnExitSolo">Exit solo</button>
+        </div>
         <div class="card scorecard">
           <div class="player">
             <div class="avatar" id="avA">B<i class="dot" id="dotA"></i></div>
@@ -92,6 +100,7 @@
 
         <div class="row-btns">
           <button class="btn soft" id="btnScore">&#127942; Scoreboard</button>
+          <button class="btn soft" id="btnSolo2">&#129302; Play solo</button>
         </div>
         <button class="link-btn" id="btnNew">Start a brand new game</button>
       </div>

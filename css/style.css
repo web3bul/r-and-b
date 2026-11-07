@@ -341,3 +341,44 @@ p { margin: 0; line-height: 1.45; }
 .slot.spinning span { animation: blur .1s linear infinite; }
 .slot.landed { border-style: solid; border-color: var(--green); background: rgba(47,210,122,.18); animation: pop .5s ease; }
 @keyframes blur { 50% { opacity: .6; transform: translateY(-2px); } }
+
+/* ---------- v2.3: 3–5 letter words + fit any phone screen ---------- */
+html, body { min-height: var(--vh, 100dvh); }
+body { min-height: var(--vh, 100dvh); }
+main { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+
+/* The guessing grid is sized in JS (--ts = tile size, --cols = word length). */
+#grid { max-width: none; align-items: center; gap: 6px; }
+#grid .row { grid-template-columns: repeat(var(--cols, 5), var(--ts, 56px)); gap: 6px; justify-content: center; }
+#grid .tile { width: var(--ts, 56px); height: var(--ts, 56px); aspect-ratio: auto; font-size: calc(var(--ts, 56px) * .52); border-radius: calc(var(--ts, 56px) * .2); }
+.word-row { grid-template-columns: repeat(var(--cols, 5), 52px); }
+.tile.optional { border-style: dashed; opacity: .45; }
+.mini-row { justify-content: center; }
+
+/* Shorter screens (most iPhones inside Telegram): tighten everything up. */
+html.short .topbar { padding: 8px 16px 4px; }
+html.short .logo { font-size: 24px; }
+html.short .icon-btn { width: 36px; height: 36px; }
+html.short .screen { gap: 10px; }
+html.short .key { height: 48px; font-size: 17px; }
+html.short .keyboard { gap: 6px; }
+html.short .clue-banner { padding: 7px 12px; font-size: 14px; }
+html.short .entry { max-width: 280px; }
+html.short .entry .tile { font-size: 26px; }
+html.short .btn.big { padding: 13px 16px; }
+html.short .field { margin-bottom: 8px; }
+html.short .field input { padding: 11px 12px; }
+html.tiny .key { height: 42px; font-size: 16px; }
+html.tiny .keyboard { gap: 5px; }
+html.tiny .entry { max-width: 230px; }
+html.tiny .board-meta { font-size: 14px; }
+html.tiny .timer { height: 30px; min-width: 48px; font-size: 14px; }
+html.tiny .btn.chip { padding: 5px 10px; }
+
+/* ---------- v2.3: solo mode ---------- */
+.solo-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: rgba(143,182,255,.18); border: 1px solid rgba(143,182,255,.5);
+  padding: 8px 10px 8px 14px; border-radius: 14px; font-weight: 600; font-size: 14px;
+}
+#homeEmpty .btn.ghost small { color: var(--muted); }
