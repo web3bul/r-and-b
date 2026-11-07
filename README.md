@@ -14,7 +14,7 @@ One player sets a secret word of 3 to 5 letters, and the other gets six guesses 
 - **Live Duel ⚡**: challenge your partner to a real-time race with a 3-2-1 countdown. Pick **Same word** (the game picks one word and you both race) or **Each other's words** (you each set one, then race). You watch their guesses live (letters, colours, what they're typing, and any not-a-word slips). First to solve wins; if nobody does, the closest guess wins. Duel wins get their own line on the scoreboard, and you can make the loser spin the forfeit wheel.
 - **Solo mode**: play against the R&B Bot. It sets you words with clues, then guesses yours live while you watch. If it wins a round, it gives you a dare. Everything stays on your phone. The bot never sees your word, only the colours of its own guesses, and it plays like a person (it sometimes misses a clue). Tap the level button to switch between Easy, Normal and Hard.
 - A hint reveals one letter and costs 1 point.
-- Letters you've already found in the right spot show up faintly in your next row, and turn green as you type them there.
+- Your next row shows a guide from your earlier guesses: green letters sit back in their spot, and yellow letters are suggested in a spot they haven't been tried in yet. As you type, a letter turns green in its known spot, or gets a yellow edge if it's in the word.
 - If the clock runs out while a complete word is typed, it counts as sent.
 - When you set a word, you can add a clue or tap **Surprise me** for a random word with an automatic clue.
 - After each result, you can send a taunt, and your partner sees it straight away.

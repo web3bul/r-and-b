@@ -449,3 +449,9 @@ html.tiny .mini-grid.feed, html.tiny .mini-grid.feed .mini-row { gap: 2px; }
 
 /* ---------- v2.7: bot difficulty ---------- */
 .solo-btns { display: flex; gap: 6px; }
+
+/* ---------- v2.8: yellow guide letters ---------- */
+.tile.known-slot .hl { opacity: .8; }
+.tile.maybe-slot { border: 2px dashed rgba(255,191,60,.8); }
+.tile.maybe-slot .hl { color: var(--yellow); opacity: .75; }
+.tile.filled.known-y { border-color: var(--yellow); box-shadow: inset 0 -5px 0 rgba(255,191,60,.45); }
