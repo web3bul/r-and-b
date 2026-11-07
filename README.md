@@ -40,6 +40,7 @@ One player sets a secret word of 3 to 5 letters, and the other gets six guesses 
 - `api/setup.js` — open once to connect the bot (webhook and Play menu button)
 - `firestore.rules` — database security rules (paste into the Firebase console)
 - `scripts/build.js` — builds `dist/`, run automatically by Vercel
+- `stats.html`, `api/stats.js` — owner-only stats page at `/stats` (password protected)
 
 ## One-time setup
 1. **Firestore**: in the Firebase console, go to Build → Firestore Database → Create database. Pick Production mode, then paste `firestore.rules` into the Rules tab and click Publish.
@@ -47,3 +48,13 @@ One player sets a secret word of 3 to 5 letters, and the other gets six guesses 
 3. **Bot token**: in Vercel, go to Project → Settings → Environment Variables and add `BOT_TOKEN` (from @BotFather), then redeploy.
 4. **Connect the bot**: open `https://r-and-b.vercel.app/api/setup` once. It should say "All set ✅".
 5. **Both players** open @RandB_game_Bot and tap **Start**, so the bot is allowed to message you.
+
+## Owner stats (`/stats`)
+A private page with numbers across everyone you've shared the game with: who's playing right now, players today and this week, everyone who has opened the game, games, words played and duels. Solo games stay on each phone, so they only show up in "people opened the game".
+
+One-time setup:
+1. **Service account key**: in the Firebase console, go to the gear icon → Project settings → Service accounts → **Generate new private key**. A `.json` file downloads. Treat it like a password and don't share it.
+2. In Vercel → Project → Settings → Environment Variables, add:
+   - `FIREBASE_SERVICE_ACCOUNT`: open the `.json` file and paste its whole contents as the value.
+   - `STATS_KEY`: any password you like. The stats page asks for it.
+3. Redeploy, then open `https://r-and-b.vercel.app/stats` and enter your `STATS_KEY`.

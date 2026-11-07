@@ -19,6 +19,7 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
   .replace(/(href="css\/[^"?]+\.css)"/g, "$1?v=" + ver + '"')
   .replace(/(src="js\/[^"?]+\.js)"/g, "$1?v=" + ver + '"');
 fs.writeFileSync(path.join(dist, "index.html"), html);
+fs.copyFileSync(path.join(root, "stats.html"), path.join(dist, "stats.html")); // owner-only stats page (data needs a password)
 fs.copyFileSync(path.join(root, "css/style.css"), path.join(dist, "css/style.css"));
 for (const f of ["app.js", "duel.js", "answers.js", "config.js", "mock.js"]) {
   fs.copyFileSync(path.join(root, "js", f), path.join(dist, "js", f));

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>R &amp; B stats</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    html { background: var(--bg3); }
+    body { background: linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 55%, var(--bg3) 100%); background-attachment: scroll; min-height: 100%; }
+    main { max-width: 760px; }
+    .live-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--green); margin-right: 6px; animation: ping 1.8s ease-out infinite; }
+    .hero-num { text-align: center; padding: 22px 16px; }
+    .hero-num .n { font-size: 64px; font-weight: 700; line-height: 1; color: #fff; }
+    .hero-num .l { color: var(--muted); margin-top: 6px; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    .stat { background: var(--card); border: 1px solid var(--card-line); border-radius: 18px; padding: 14px 16px; }
+    .stat .n { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .stat .l { color: var(--muted); font-size: 14px; }
+    .stat .s { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    h3.sec { margin: 6px 4px 0; color: var(--muted); font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; }
+    .games { display: flex; flex-direction: column; gap: 8px; }
+    .g { display: flex; justify-content: space-between; gap: 10px; align-items: center; background: rgba(0,0,0,.15); padding: 10px 14px; border-radius: 14px; }
+    .g b { font-weight: 600; }
+    .g .m { color: var(--muted); font-size: 13px; text-align: right; white-space: nowrap; }
+    .foot { text-align: center; color: var(--muted); font-size: 13px; }
+    .err { color: #ffb3b3; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="sparkles" aria-hidden="true"></div>
+  <header class="topbar">
+    <span style="width:40px"></span>
+    <div class="logo">R <span class="amp">&amp;</span> B <span style="font-size:16px;color:var(--muted)">stats</span></div>
+    <button class="icon-btn" id="btnLock" title="Lock">&#128274;</button>
+  </header>
+  <main>
+    <section class="screen active" id="login" hidden>
+      <div class="card center">
+        <div class="big-emoji">&#128202;</div>
+        <h2>Owner stats</h2>
+        <p class="muted">Enter the STATS_KEY password you set in Vercel.</p>
+        <label class="field full">Password<input id="inKey" type="password" autocomplete="current-password"></label>
+        <button class="btn primary big" id="btnGo">Show stats</button>
+        <p class="err" id="loginErr"></p>
+      </div>
+    </section>
+
+    <section class="screen" id="dash">
+      <div class="card hero-num">
+        <div class="n" id="nNow">0</div>
+        <div class="l"><span class="live-dot"></span>playing right now</div>
+      </div>
+      <div class="tiles">
+        <div class="stat"><div class="n" id="nToday">0</div><div class="l">players today</div></div>
+        <div class="stat"><div class="n" id="nWeek">0</div><div class="l">players this week</div></div>
+        <div class="stat"><div class="n" id="nGamesToday">0</div><div class="l">games active today</div></div>
+      </div>
+      <h3 class="sec">All time</h3>
+      <div class="tiles">
+        <div class="stat"><div class="n" id="nOpened">0</div><div class="l">people opened the game</div><div class="s" id="sOpened"></div></div>
+        <div class="stat"><div class="n" id="nPlayers">0</div><div class="l">players in a game</div></div>
+        <div class="stat"><div class="n" id="nGames">0</div><div class="l">games created</div><div class="s" id="sGames"></div></div>
+        <div class="stat"><div class="n" id="nWords">0</div><div class="l">words played</div></div>
+        <div class="stat"><div class="n" id="nDuels">0</div><div class="l">live duels</div></div>
+        <div class="stat"><div class="n" id="nRounds">0</div><div class="l">rounds won</div></div>
+      </div>
+      <h3 class="sec">Most recent games</h3>
+      <div class="card"><div class="games" id="games"></div></div>
+      <p class="foot" id="foot"></p>
+    </section>
+  </main>
+  <script>
+  (function () {
+    var $ = function (s) { return document.querySelector(s); };
+    var key = ""; try { key = localStorage.getItem("rb_stats_key") || ""; } catch (e) {}
+    var timer = null;
+    function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+    function ago(t) {
+      if (!t) return "never";
+      var s = Math.round((Date.now() - t) / 1000);
+      if (s < 45) return "now"; if (s < 3600) return Math.round(s / 60) + "m ago";
+      if (s < 86400) return Math.round(s / 3600) + "h ago"; return Math.round(s / 86400) + "d ago";
+    }
+    function n(x) { return Number(x || 0).toLocaleString(); }
+    function showLogin(msg) {
+      clearInterval(timer); $("#dash").classList.remove("active"); $("#login").hidden = false; $("#login").classList.add("active");
+      $("#loginErr").textContent = msg || ""; $("#inKey").value = ""; setTimeout(function () { $("#inKey").focus(); }, 50);
+    }
+    function load() {
+      fetch("/api/stats", { headers: { "x-stats-key": key } }).then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); })
+        .then(function (o) {
+          if (o.s === 401) { try { localStorage.removeItem("rb_stats_key"); } catch (e) {} return showLogin("Wrong password"); }
+          if (!o.j.ok) { $("#foot").textContent = o.j.error || "Something went wrong"; $("#foot").className = "foot err"; return; }
+          try { localStorage.setItem("rb_stats_key", key); } catch (e) {}
+          $("#login").hidden = true; $("#login").classList.remove("active"); $("#dash").classList.add("active");
+          var t = o.j.totals, a = o.j.active;
+          $("#nNow").textContent = n(a.now); $("#nToday").textContent = n(a.today); $("#nWeek").textContent = n(a.week); $("#nGamesToday").textContent = n(a.gamesToday);
+          $("#nOpened").textContent = n(t.opened); $("#sOpened").textContent = n(t.openedToday) + " opened today · includes solo-only players";
+          $("#nPlayers").textContent = n(t.players);
+          $("#nGames").textContent = n(t.games); $("#sGames").textContent = n(t.paired) + " with two players · " + n(t.waiting) + " waiting";
+          $("#nWords").textContent = n(t.words); $("#nDuels").textContent = n(t.duels); $("#nRounds").textContent = n(t.rounds);
+          $("#games").innerHTML = o.j.recent.length ? o.j.recent.map(function (g) {
+            return '<div class="g"><div>' + (g.live ? '<span class="live-dot"></span>' : "") + "<b>" + esc(g.names.join(" & ") || "?") + "</b></div>" +
+              '<div class="m">' + n(g.words) + " words · " + ago(g.last) + "</div></div>";
+          }).join("") : '<p class="muted">No games yet.</p>';
+          $("#foot").className = "foot"; $("#foot").textContent = "Updated " + new Date(o.j.at).toLocaleTimeString() + " · refreshes every 30 seconds";
+        })
+        .catch(function () { $("#foot").textContent = "Couldn't reach the server"; $("#foot").className = "foot err"; });
+    }
+    function start() { clearInterval(timer); load(); timer = setInterval(load, 30000); }
+    $("#btnGo").addEventListener("click", function () { key = $("#inKey").value.trim(); if (key) start(); });
+    $("#inKey").addEventListener("keydown", function (e) { if (e.key === "Enter") $("#btnGo").click(); });
+    $("#btnLock").addEventListener("click", function () { try { localStorage.removeItem("rb_stats_key"); } catch (e) {} key = ""; showLogin(); });
+    if (key) start(); else showLogin();
+  })();
+  </script>
+</body>
+</html>
