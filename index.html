@@ -89,6 +89,14 @@
         <div class="card live-card" id="liveCard" hidden>
           <div class="live-head"><div class="live-title" id="liveTitle">Reye is guessing your word</div><div class="live-timer" id="liveTimer" hidden></div></div>
           <div class="mini-grid" id="liveGrid"></div>
+          <div class="react-bar" id="reactBar">
+            <button class="react-btn" data-e="laugh" aria-label="Laugh">&#128514;</button>
+            <button class="react-btn" data-e="cry" aria-label="Cry">&#128557;</button>
+            <button class="react-btn" data-e="scream" aria-label="Scream">&#128561;</button>
+            <button class="react-btn" data-e="clap" aria-label="Clap">&#128079;</button>
+            <button class="react-btn" data-e="clown" aria-label="Clown">&#129313;</button>
+            <button class="react-btn" data-e="kiss" aria-label="Kiss">&#128536;</button>
+          </div>
         </div>
 
         <div class="last-line" id="lastLine" hidden></div>
@@ -262,6 +270,7 @@
 
   <div class="toast" id="toast"></div>
   <div class="bubble" id="bubble"></div>
+  <div class="floaters" id="floaters" aria-hidden="true"></div>
   <div class="countdown" id="countdown" hidden><span id="cdNum">3</span></div>
 
   <script src="js/config.js"></script>

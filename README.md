@@ -18,6 +18,7 @@ One player sets a secret word of 3 to 5 letters, and the other gets six guesses 
 - If the clock runs out while a complete word is typed, it counts as sent.
 - When you set a word, you can add a clue or tap **Surprise me** for a random word with an automatic clue.
 - After each result, you can send a taunt, and your partner sees it straight away.
+- **Reactions**: while you watch your partner guess, tap 😂 😭 😱 👏 🤡 😘. Each one floats up their screen with its own sound effect (made in the browser, no audio files).
 
 ## How it works
 - **Live game**: both phones share one game stored in Firebase (Firestore), so turns, guesses, taunts and scores update instantly.
