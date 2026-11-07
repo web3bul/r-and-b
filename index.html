@@ -69,6 +69,15 @@
           </div>
         </div>
 
+        <div class="card duel-card" id="duelCard" hidden>
+          <div class="ff-title" id="dcTitle"></div>
+          <div class="ff-text" id="dcText"></div>
+          <div class="row-btns" id="dcBtns">
+            <button class="btn primary" id="btnDc1" hidden></button>
+            <button class="btn soft" id="btnDc2" hidden></button>
+          </div>
+        </div>
+
         <div class="card forfeit-card" id="forfeitCard" hidden>
           <div class="ff-title" id="ffTitle"></div>
           <div class="ff-text" id="ffText"></div>
@@ -93,9 +102,9 @@
           <span class="btn-emoji">&#128172;</span>
           <span><b id="mainTitle">Take Turns</b><small id="mainSub">Set a word</small></span>
         </button>
-        <button class="btn ghost big" id="btnDuel" disabled>
+        <button class="btn ghost big" id="btnDuel">
           <span class="btn-emoji">&#9889;</span>
-          <span><b>Live Duel</b><small>Coming soon</small></span>
+          <span><b>Live Duel</b><small id="duelSub">Race each other live</small></span>
         </button>
 
         <div class="row-btns">
@@ -195,6 +204,51 @@
       </div>
     </section>
 
+    <!-- LIVE DUEL: SETUP -->
+    <section class="screen" id="duelSetup">
+      <div class="card center">
+        <div class="big-emoji">&#9889;</div>
+        <h2>Live Duel</h2>
+        <p class="muted">You both guess at the same time. First to solve wins.</p>
+      </div>
+      <button class="mode-card on" id="modeSame" data-mode="same">
+        <span class="mode-emoji">&#127919;</span>
+        <span><b>Same word</b><small>The game picks one word and you both race to crack it. The fairest fight.</small></span>
+      </button>
+      <button class="mode-card" id="modeEach" data-mode="each">
+        <span class="mode-emoji">&#128140;</span>
+        <span><b>Each other's words</b><small>You each set a secret word for the other, then race.</small></span>
+      </button>
+      <label class="stake-row"><input type="checkbox" id="inStake" checked> <span>&#128520; Loser spins the forfeit wheel</span></label>
+      <button class="btn primary big" id="btnChallenge">Send challenge &#9889;</button>
+    </section>
+
+    <!-- LIVE DUEL: RACE -->
+    <section class="screen" id="duel">
+      <div class="duel-top" id="duelTop">
+        <div class="opp">
+          <div class="opp-head"><b id="oppName">Reye</b><span id="oppStatus">0/6</span></div>
+          <div class="mini-grid small" id="oppGrid"></div>
+        </div>
+        <div class="duel-side">
+          <div class="timer" id="dTimer">15s</div>
+          <div class="duel-mode" id="duelModeTag">&#127919; Same word</div>
+        </div>
+      </div>
+      <div class="clue-banner" id="dClue" hidden></div>
+      <div class="grid" id="dGrid"></div>
+      <div class="keyboard" id="kbDuel"></div>
+      <div class="card center duel-result" id="duelResult" hidden>
+        <h1 id="drTitle">You won!</h1>
+        <div class="dr-lines" id="drLines"></div>
+        <p class="muted" id="drStake"></p>
+        <div class="row-btns">
+          <button class="btn primary" id="btnRematch">&#9889; Rematch</button>
+          <button class="btn soft" id="btnDuelHome">Home</button>
+        </div>
+      </div>
+    </section>
+
     <!-- SCOREBOARD -->
     <section class="screen" id="score">
       <h2 class="title">Scoreboard</h2>
@@ -208,12 +262,14 @@
 
   <div class="toast" id="toast"></div>
   <div class="bubble" id="bubble"></div>
+  <div class="countdown" id="countdown" hidden><span id="cdNum">3</span></div>
 
   <script src="js/config.js"></script>
   <script src="js/answers.js"></script>
   <script src="js/valid.js"></script>
   <script src="js/mock.js"></script>
   <script src="js/net.js"></script>
+  <script src="js/duel.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
