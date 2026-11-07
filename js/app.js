@@ -113,6 +113,9 @@
     var t = G.seen && G.seen[G.uids[i]];
     return !!t && Date.now() - t < ONLINE_MS;
   }
+  function okWord(w) { return w.length >= CFG.MIN_LEN && w.length <= CFG.MAX_LEN && VALID.has(w); }
+  function isBurned(row) { return /^\.+$/.test(row); }
+  function wordLen() { return (G && G.word && G.word.length) || CFG.MAX_LEN; }
   function randId(n) {
     var chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", out = "";
     var bytes = new Uint8Array(n); (window.crypto || window.msCrypto).getRandomValues(bytes);
@@ -165,12 +168,13 @@
 
   /* ---------- scoring ---------- */
   function scoreGuess(guess, answer) {
-    var res = ["x", "x", "x", "x", "x"], left = {};
-    for (var i = 0; i < 5; i++) {
+    var n = answer.length, res = [], left = {};
+    for (var i = 0; i < n; i++) {
+      res.push("x");
       if (guess[i] === answer[i]) res[i] = "g";
       else left[answer[i]] = (left[answer[i]] || 0) + 1;
     }
-    for (var j = 0; j < 5; j++) {
+    for (var j = 0; j < n; j++) {
       if (res[j] !== "g" && left[guess[j]]) { res[j] = "y"; left[guess[j]]--; }
     }
     return res;
@@ -213,6 +217,8 @@
     var live = $("#liveCard");
     status.classList.remove("go"); btn.disabled = false; live.hidden = true;
     $("#btnInvite").hidden = partner;
+    $("#soloBar").hidden = !solo;
+    $("#btnSolo2").hidden = solo;
 
     if (G.phase === "setting") {
       if (G.setter === me) {
@@ -227,7 +233,7 @@
       if (guesser() === me) {
         status.textContent = "Your turn to guess! 🎯"; status.classList.add("go");
         title.textContent = (G.guesses && G.guesses.length ? "Keep guessing" : "Guess " + partnerName() + "'s word");
-        sub.textContent = (CFG.MAX_GUESSES - (G.guesses || []).length) + " guesses left" + (G.clue ? " · clue inside" : "");
+        sub.textContent = wordLen() + "-letter word · " + (CFG.MAX_GUESSES - (G.guesses || []).length) + " guesses left" + (G.clue ? " · clue inside" : "");
       } else if (!partner) {
         status.textContent = "Word ready. Now invite your partner 💌";
         title.textContent = "Waiting for your partner"; sub.textContent = "They'll guess as soon as they join";
@@ -244,7 +250,7 @@
   function renderLive() {
     var live = $("#liveCard"), grid = $("#liveGrid");
     live.hidden = false;
-    var rows = G.guesses || [], typing = (G.typing || "").slice(0, 5);
+    var L = wordLen(), rows = G.guesses || [], typing = (G.typing || "").slice(0, L);
     $("#liveTitle").textContent = typing
       ? partnerName() + " is typing… ✍️"
       : rows.length
@@ -254,7 +260,7 @@
     for (var r = 0; r < CFG.MAX_GUESSES; r++) {
       var row = document.createElement("div"); row.className = "mini-row";
       var res = rows[r] ? scoreGuess(rows[r], G.word) : null;
-      for (var c = 0; c < 5; c++) {
+      for (var c = 0; c < L; c++) {
         var m = document.createElement("div"); m.className = "mini" + (res ? " " + res[c] : "");
         if (res) {
           m.textContent = rows[r][c] === "." ? "" : rows[r][c];
@@ -293,7 +299,7 @@
   /* ---------- live updates ---------- */
   function watchGame(id) {
     if (unsub) { try { unsub(); } catch (e) {} }
-    gameId = id; store.set("gameId", id);
+    gameId = id; if (!solo) store.set("gameId", id);
     var first = true;
     unsub = NET.watch(id, function (doc) {
       if (!doc) { if (first) lostGame(); return; }
@@ -315,7 +321,7 @@
     // Partner's taunt
     if (G.taunt && G.taunt.from !== me && G.taunt.at > seenTaunt) {
       seenTaunt = G.taunt.at; store.set("seenTaunt", seenTaunt);
-      if (Date.now() - G.taunt.at < 10 * 60 * 1000) { bubble(partnerName() + " says", TAUNTS[G.taunt.i] || ""); sfx.pop(); haptic("light"); }
+      if (Date.now() - G.taunt.at < 10 * 60 * 1000) { bubble(partnerName() + " says", G.taunt.text || TAUNTS[G.taunt.i] || ""); sfx.pop(); haptic("light"); }
     }
     if (!first && prev) {
       // Partner joined
@@ -346,6 +352,7 @@
     if (first && ["loading", "join", "setup", "home"].indexOf(screen) >= 0) goHome();
     else if (screen === "home") renderHome();
     if (first) heartbeat();
+    if (solo) botTick();
   }
 
   /* ---------- presence ---------- */
@@ -414,6 +421,7 @@
     var name = $("#inMe").value.trim().slice(0, 12);
     if (!name) { toast("Add your name first 💜"); return; }
     store.set("myName", name);
+    leaveSoloQuietly();
     var id = randId(12), now = Date.now();
     var seen = {}; seen[uid] = now;
     var doc = {
@@ -443,6 +451,7 @@
     var name = $("#inJoinName").value.trim().slice(0, 12);
     if (!name) { toast("Add your name first 💜"); return; }
     store.set("myName", name);
+    leaveSoloQuietly();
     $("#btnJoin").disabled = true;
     NET.join(joinId, uid, { uid: uid, name: name, tg: tgUser ? tgUser.id : null }, Date.now()).then(function () {
       G = null; watchGame(joinId);
@@ -501,7 +510,7 @@
   }
   function maybeAutoClue() {
     var inp = $("#inClue"), note = $("#clueNote");
-    var ok = setWord.length === 5 && VALID.has(setWord);
+    var ok = okWord(setWord);
     // Clear a clue that belonged to a different word (unless the user wrote it).
     if (clueSource && clueSource !== "user" && clueFor !== setWord) { inp.value = ""; clueSource = ""; note.textContent = ""; }
     if (!ok || clueSource) return;
@@ -515,23 +524,26 @@
   }
   function renderEntry() {
     var e = $("#entry"); e.innerHTML = "";
-    for (var i = 0; i < 5; i++) {
-      var t = document.createElement("div"); t.className = "tile" + (setWord[i] ? " filled" : "");
+    for (var i = 0; i < CFG.MAX_LEN; i++) {
+      var t = document.createElement("div");
+      // Boxes past the minimum length are optional; they fade once the word could stop there.
+      t.className = "tile" + (setWord[i] ? " filled" : (i >= CFG.MIN_LEN && i >= setWord.length && setWord.length >= CFG.MIN_LEN ? " optional" : ""));
       t.textContent = setWord[i] || ""; e.appendChild(t);
     }
     e.classList.toggle("hidden-word", hideWord);
-    var msg = $("#entryMsg"), ok = setWord.length === 5 && VALID.has(setWord);
+    var msg = $("#entryMsg"), ok = okWord(setWord), n = setWord.length;
     msg.className = "entry-msg";
-    if (setWord.length < 5) msg.textContent = "Type a five-letter word";
-    else if (ok) { msg.textContent = "✓ Valid word"; msg.classList.add("ok"); }
-    else { msg.textContent = "Not in the word list"; msg.classList.add("bad"); }
+    if (n < CFG.MIN_LEN) msg.textContent = "Type a word of " + CFG.MIN_LEN + " to " + CFG.MAX_LEN + " letters";
+    else if (ok) { msg.textContent = "✓ " + n + "-letter word" + (n < CFG.MAX_LEN ? " · send it, or keep typing" : ""); msg.classList.add("ok"); }
+    else { msg.textContent = n < CFG.MAX_LEN ? "Not a word yet… keep typing" : "Not in the word list"; if (n === CFG.MAX_LEN) msg.classList.add("bad"); }
     $("#btnSend").disabled = !ok;
+    $("#btnSend").innerHTML = ok ? "Send " + n + "-letter word &#128140;" : "Send it &#128140;";
     maybeAutoClue();
   }
   function onSetKey(k) {
     if (k === "back") setWord = setWord.slice(0, -1);
     else if (k === "enter") { if (!$("#btnSend").disabled) sendWord(); return; }
-    else if (setWord.length < 5) setWord += k;
+    else if (setWord.length < CFG.MAX_LEN) setWord += k;
     sfx.key(); haptic("light"); renderEntry();
   }
   function startSet() {
@@ -550,7 +562,7 @@
     sfx.pop(); renderEntry();
   }
   function sendWord() {
-    if (setWord.length !== 5 || !VALID.has(setWord) || !G) return;
+    if (!okWord(setWord) || !G) return;
     var clue = $("#inClue").value.trim().slice(0, CLUE_MAX);
     $("#btnSend").disabled = true;
     patch({ word: setWord, clue: clue, phase: "guessing", guesses: [], hints: [] }).then(function () {
@@ -565,10 +577,10 @@
   function startBoard() {
     if (!G || G.phase !== "guessing" || guesser() !== me) { goHome(); return; }
     cur = ""; locked = false;
-    $("#bFor").textContent = "Guess " + partnerName() + "'s word";
+    $("#bFor").textContent = "Guess " + partnerName() + "'s " + wordLen() + "-letter word";
     var cb = $("#bClue"); cb.hidden = !G.clue; cb.textContent = "Clue: " + G.clue;
     buildKeyboard($("#kbBoard"), onBoardKey);
-    renderBoard(); show("board");
+    show("board"); renderBoard();
     activeKeyHandler = onBoardKey;
     startClock(savedClock());
   }
@@ -619,7 +631,7 @@
   function timeUp() {
     if (screen !== "board" || !G || G.phase !== "guessing" || guesser() !== me) return;
     if (locked) { setTimeout(timeUp, 300); return; }
-    var rows = (G.guesses || []).concat(["....."]), rowIdx = rows.length - 1;
+    var rows = (G.guesses || []).concat([new Array(wordLen() + 1).join(".")]), rowIdx = rows.length - 1;
     G.guesses = rows; cur = "";
     toast("⏱ Time's up! That guess is gone"); sfx.bad(); haptic("warning");
     locked = true; renderBoard(rowIdx);
@@ -635,15 +647,16 @@
     typingTimer = setTimeout(function () { if (screen === "board") NET.patch(gameId, { typing: cur }).catch(function () {}); }, 120);
   }
   function renderBoard(animateRow) {
-    var rows = G.guesses || [], hints = G.hints || [], grid = $("#grid"); grid.innerHTML = "";
+    var L = wordLen(), rows = G.guesses || [], hints = G.hints || [], grid = $("#grid"); grid.innerHTML = "";
+    grid.style.setProperty("--cols", L);
     for (var r = 0; r < CFG.MAX_GUESSES; r++) {
       var row = document.createElement("div"); row.className = "row";
       var done = rows[r], res = done ? scoreGuess(done, G.word) : null;
-      for (var c = 0; c < 5; c++) {
+      for (var c = 0; c < L; c++) {
         var t = document.createElement("div"); t.className = "tile";
         if (done) {
           t.textContent = done[c] === "." ? "" : done[c];
-          if (done === ".....") t.classList.add("burned");
+          if (isBurned(done)) t.classList.add("burned");
           if (r === animateRow) {
             (function (tile, cls, delay) {
               tile.style.animationDelay = delay + "ms"; tile.classList.add("flip");
@@ -659,7 +672,29 @@
       grid.appendChild(row);
     }
     paintKeys(animateRow != null ? 1100 : 0);
+    fitBoard();
   }
+  // Size the tiles so the clue, grid and keyboard all fit on screen without scrolling,
+  // using the height Telegram actually gives the Mini App (iPhones vary a lot).
+  function viewH() { return Math.round((tg && tg.viewportStableHeight) || window.innerHeight || 700); }
+  function fitScreen() {
+    var h = viewH();
+    document.documentElement.style.setProperty("--vh", h + "px");
+    document.documentElement.classList.toggle("short", h < 720);
+    document.documentElement.classList.toggle("tiny", h < 620);
+    fitBoard();
+  }
+  function fitBoard() {
+    if (screen !== "board" || !G || !G.word) return;
+    var grid = $("#grid"), L = wordLen(), gap = 6;
+    var used = $(".topbar").offsetHeight + $("#board .board-top").offsetHeight + $("#kbBoard").offsetHeight + 14 * 2 + 18;
+    var byH = (viewH() - used - gap * (CFG.MAX_GUESSES - 1)) / CFG.MAX_GUESSES;
+    var byW = (Math.min(window.innerWidth - 32, 420) - gap * (L - 1)) / L;
+    var ts = Math.max(28, Math.floor(Math.min(byH, byW, 66)));
+    grid.style.setProperty("--ts", ts + "px");
+  }
+  window.addEventListener("resize", fitScreen);
+  if (tg && tg.onEvent) { try { tg.onEvent("viewportChanged", fitScreen); } catch (e) {} }
   function paintKeys(delay) {
     var best = {}, rank = { x: 1, y: 2, g: 3 };
     (G.guesses || []).forEach(function (g) {
@@ -676,7 +711,7 @@
     if (locked || !G || G.phase !== "guessing" || guesser() !== me) return;
     if (k === "back") { cur = cur.slice(0, -1); sfx.key(); renderBoard(); sendTyping(); return; }
     if (k === "enter") return submitGuess();
-    if (cur.length < 5) { cur += k; sfx.key(); haptic("light"); renderBoard(); sendTyping(); }
+    if (cur.length < wordLen()) { cur += k; sfx.key(); haptic("light"); renderBoard(); sendTyping(); }
   }
   function shakeRow(msg) {
     var rows = document.querySelectorAll("#grid .row"), row = rows[(G.guesses || []).length];
@@ -684,7 +719,7 @@
     toast(msg); sfx.bad(); haptic("error");
   }
   function submitGuess() {
-    if (cur.length < 5) return shakeRow("Not enough letters");
+    if (cur.length < wordLen()) return shakeRow("Not enough letters");
     if (!VALID.has(cur)) return shakeRow("Not in the word list");
     var rows = (G.guesses || []).concat([cur]), guess = cur, rowIdx = rows.length - 1;
     G.guesses = rows; cur = ""; clearTimeout(typingTimer);
@@ -703,7 +738,7 @@
     var known = {};
     (G.guesses || []).forEach(function (g) { scoreGuess(g, G.word).forEach(function (r, i) { if (r === "g") known[i] = 1; }); });
     (G.hints || []).forEach(function (i) { known[i] = 1; });
-    var open = [0, 1, 2, 3, 4].filter(function (i) { return !known[i]; });
+    var open = []; for (var p = 0; p < wordLen(); p++) if (!known[p]) open.push(p);
     if (open.length <= 1) { toast("No more hints — you've got this!"); return; }
     var pick = open[Math.floor(Math.random() * open.length)];
     G.hints = (G.hints || []).concat([pick]);
@@ -731,7 +766,7 @@
       typing: "", deadline: 0, clockLeft: 0
     };
     // The round is over: the winner gets to pick the loser's forfeit.
-    if (rw >= 0) fields.forfeit = { w: rw, l: other(rw), state: "pending", text: "", at: now };
+    if (rw >= 0) fields.forfeit = solo ? soloForfeit(rw, now) : { w: rw, l: other(rw), state: "pending", text: "", at: now };
     patch(fields).then(function () {
       notify({ type: "result", w: word, t: tries, p: pts, rw: rw < 0 ? "" : (rw === me ? "sender" : "you") });
     });
@@ -743,7 +778,7 @@
     var l = localResult; if (!l) return goHome();
     var solved = l.t > 0;
     $("#rTitle").textContent = solved ? (l.t <= 2 ? "Genius! 🤯" : l.t <= 4 ? "You got it! 🎉" : "Phew, close one! 😅") : "So close… 💔";
-    var wr = $("#rWord"); wr.innerHTML = "";
+    var wr = $("#rWord"); wr.innerHTML = ""; wr.style.setProperty("--cols", l.w.length);
     l.w.split("").forEach(function (ch, i) {
       var t = document.createElement("div"); t.className = "tile flip " + (solved ? "g" : "x");
       t.style.animationDelay = (i * 120) + "ms"; t.textContent = ch; wr.appendChild(t);
@@ -756,7 +791,7 @@
     rr.hidden = !(l.rw >= 0);
     if (l.rw >= 0) rr.textContent = "🏆 " + (l.rw === me ? "You won the round!" : partnerName() + " won the round!") + " Scores reset to 0.";
     $("#rTally").textContent = myName() + " " + l.s[me] + "  ·  " + partnerName() + " " + l.s[other(me)];
-    $("#btnNext").textContent = l.rw === me ? "🎡 Pick " + partnerName() + "'s forfeit" : "Your turn: set a word";
+    $("#btnNext").textContent = l.rw === me && !solo ? "🎡 Pick " + partnerName() + "'s forfeit" : solo ? "Next: set a word for the bot" : "Your turn: set a word";
     renderTaunts();
     show("result");
     if (solved) { sfx.win(); haptic("success"); confetti(); } else { sfx.lose(); haptic("warning"); }
@@ -872,6 +907,151 @@
     sfx.ding(); renderHome();
   }
 
+  /* ---------- SOLO MODE (vs the R&B Bot) ----------
+   * Same game, but the other player is a bot and the game lives on this phone only.
+   * The bot sets words (with clues) and guesses your words live, letter by letter. */
+  var BOT = "rnb-bot", BOT_I = 1;
+  var solo = false, onlineId = null;
+  var ONLINE_NET = NET;
+  function clone(x) { return x == null ? x : JSON.parse(JSON.stringify(x)); }
+  var SoloNet = (function () {
+    var doc = store.get("soloGame", null), cbs = [];
+    function emit() { var d = clone(doc); cbs.forEach(function (cb) { setTimeout(function () { cb(clone(d)); }, 0); }); }
+    function setPath(o, k, v) {
+      var p = k.split("."), x = o;
+      for (var i = 0; i < p.length - 1; i++) { x[p[i]] = x[p[i]] || {}; x = x[p[i]]; }
+      x[p[p.length - 1]] = v;
+    }
+    return {
+      get: function () { return clone(doc); },
+      reset: function () { doc = null; store.set("soloGame", null); },
+      ready: function () { return Promise.resolve(uid); },
+      create: function (id, data) { doc = clone(data); store.set("soloGame", doc); emit(); return Promise.resolve(); },
+      join: function () { return Promise.reject({ code: "not-found" }); },
+      watch: function (id, cb) { cbs.push(cb); setTimeout(function () { cb(clone(doc)); }, 0); return function () { cbs = cbs.filter(function (x) { return x !== cb; }); }; },
+      patch: function (id, fields) {
+        if (!doc) return Promise.reject({ code: "not-found" });
+        Object.keys(fields).forEach(function (k) { setPath(doc, k, clone(fields[k])); });
+        store.set("soloGame", doc); emit(); return Promise.resolve();
+      }
+    };
+  })();
+  function newSoloDoc() {
+    var name = store.get("myName", (tgUser && tgUser.first_name) || "You").slice(0, 12) || "You";
+    var seen = {}; seen[uid] = Date.now(); seen[BOT] = 9e15;
+    return {
+      v: 2, solo: true, createdAt: Date.now(), uids: [uid, BOT],
+      players: [{ uid: uid, name: name, tg: null }, { uid: BOT, name: CFG.BOT_NAME, tg: null }],
+      s: [0, 0], r: [0, 0], t: 0, setter: BOT_I, phase: "setting", word: "", clue: "",
+      guesses: [], hints: [], last: null, taunt: null, history: [], seen: seen
+    };
+  }
+  function enterSolo(fresh) {
+    stopBot();
+    if (!solo) onlineId = gameId;
+    if (unsub) { try { unsub(); } catch (e) {} unsub = null; }
+    solo = true; NET = SoloNet; G = null;
+    var d = SoloNet.get();
+    if (fresh || !d || d.uids[0] !== uid) { d = newSoloDoc(); SoloNet.create("solo", d); }
+    toast("🤖 Solo mode: you vs the bot");
+    watchGame("solo");
+  }
+  function exitSolo() {
+    stopBot();
+    if (unsub) { try { unsub(); } catch (e) {} unsub = null; }
+    solo = false; NET = ONLINE_NET; G = null; gameId = null;
+    if (onlineId) watchGame(onlineId); else goHome();
+  }
+  function leaveSoloQuietly() {
+    store.set("mode", "online");
+    if (!solo) return;
+    stopBot(); if (unsub) { try { unsub(); } catch (e) {} unsub = null; }
+    solo = false; NET = ONLINE_NET;
+  }
+  function soloForfeit(rw, now) {
+    // The bot only hands out dares when it wins a round. If you win, you just get the glory.
+    if (rw !== BOT_I) return null;
+    var list = CFG.SOLO_DARES;
+    return { w: BOT_I, l: 0, state: "set", text: list[Math.floor(Math.random() * list.length)], at: now, setAt: now };
+  }
+
+  // --- the bot's brain ---
+  var botBusy = false, botTimers = [], poolCache = {};
+  function botLater(fn, ms) {
+    var t = setTimeout(function () { botTimers = botTimers.filter(function (x) { return x !== t; }); if (solo) fn(); }, ms);
+    botTimers.push(t);
+  }
+  function stopBot() { botTimers.forEach(clearTimeout); botTimers = []; botBusy = false; }
+  function botTick() {
+    if (!solo || !G || botBusy) return;
+    if (G.phase === "setting" && G.setter === BOT_I) { botBusy = true; botLater(botSetWord, 1500); }
+    else if (G.phase === "guessing" && guesser() === BOT_I) { botBusy = true; botLater(botGuess, 1200 + Math.random() * 1200); }
+  }
+  function botSetWord() {
+    var used = (G.history || []).map(function (h) { return h.w; });
+    var fresh = ANSWERS.filter(function (a) { return used.indexOf(a.w) < 0; });
+    var list = fresh.length ? fresh : ANSWERS;
+    var pick = list[Math.floor(Math.random() * list.length)];
+    NET.patch("solo", { word: pick.w, clue: pick.c, phase: "guessing", guesses: [], hints: [], deadline: 0, clockLeft: 0, typing: "" })
+      .then(function () { botBusy = false; });
+  }
+  function pool(L) {
+    if (!poolCache[L]) {
+      var common = ANSWERS.filter(function (a) { return a.w.length === L; }).map(function (a) { return a.w; });
+      var all = []; VALID.forEach(function (w) { if (w.length === L) all.push(w); });
+      poolCache[L] = { common: common, all: all };
+    }
+    return poolCache[L];
+  }
+  function sameScore(a, b) { for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
+  function botChoose() {
+    var L = G.word.length, rows = (G.guesses || []).filter(function (g) { return !isBurned(g); }), P = pool(L);
+    function pickFrom(list) { return list[Math.floor(Math.random() * list.length)]; }
+    if (!rows.length) return pickFrom(P.common.length && Math.random() < .7 ? P.common : P.all);
+    var fits = function (w) { return rows.every(function (g) { return sameScore(scoreGuess(g, w), scoreGuess(g, G.word)); }); };
+    // The bot isn't perfect: sometimes it only pays attention to the green letters.
+    var sloppy = Math.random() < 0.3;
+    var greensFit = function (w) { return rows.every(function (g) { var r = scoreGuess(g, G.word); for (var i = 0; i < L; i++) if (r[i] === "g" && w[i] !== g[i]) return false; return true; }); };
+    var test = sloppy ? greensFit : fits;
+    var common = P.common.filter(test).filter(function (w) { return rows.indexOf(w) < 0; });
+    if (common.length && Math.random() < .6) return pickFrom(common);
+    var all = P.all.filter(test).filter(function (w) { return rows.indexOf(w) < 0; });
+    return all.length ? pickFrom(all) : pickFrom(P.all);
+  }
+  function botGuess() {
+    if (!G || G.phase !== "guessing" || guesser() !== BOT_I) { botBusy = false; return; }
+    var guess = botChoose(), L = guess.length;
+    // "Type" the guess one letter at a time so you can watch it think.
+    for (var i = 1; i <= L; i++) (function (n) { botLater(function () { NET.patch("solo", { typing: guess.slice(0, n) }); }, 260 * n); })(i);
+    botLater(function () {
+      var rows = (G.guesses || []).concat([guess]);
+      var solved = guess === G.word, out = rows.length >= CFG.MAX_GUESSES;
+      if (solved || out) { G.guesses = rows; botFinish(solved); }
+      else NET.patch("solo", { guesses: rows, typing: "" }).then(function () { botBusy = false; });
+    }, 260 * L + 500);
+  }
+  function botFinish(solved) {
+    var g = BOT_I, setter = 0, rows = G.guesses || [];
+    var tries = solved ? rows.length : 0;
+    var pts = solved ? Math.max(0, CFG.MAX_GUESSES + 1 - tries) : 0;
+    var s = G.s.slice(), r = G.r.slice();
+    s[g] += pts; if (!solved) s[setter] += CFG.STUMP_BONUS;
+    var rw = -1;
+    if (s[g] >= CFG.POINTS_TO_WIN) rw = g; else if (s[setter] >= CFG.POINTS_TO_WIN) rw = setter;
+    if (rw >= 0) { r[rw]++; s = [0, 0]; }
+    var now = Date.now(), word = G.word;
+    var lines = solved ? CFG.BOT_TAUNTS_WIN : CFG.BOT_TAUNTS_LOSE;
+    var fields = {
+      s: s, r: r, last: { g: g, w: word, t: tries, p: pts, rw: rw, at: now },
+      history: [{ w: word, g: g, t: tries, p: pts, at: now }].concat(G.history || []).slice(0, 40),
+      phase: "setting", setter: g, word: "", clue: "", guesses: [], hints: [], t: G.t + 1,
+      typing: "", deadline: 0, clockLeft: 0,
+      taunt: { from: g, text: lines[Math.floor(Math.random() * lines.length)], at: now + 1500 }
+    };
+    if (rw >= 0) fields.forfeit = soloForfeit(rw, now);
+    NET.patch("solo", fields).then(function () { botBusy = false; });
+  }
+
   /* ---------- SCOREBOARD ---------- */
   function showScore() {
     if (!G) return;
@@ -906,7 +1086,13 @@
   /* ---------- wiring ---------- */
   function on(id, fn) { $(id).addEventListener("click", fn); }
   on("#btnStart", startSetup);
-  on("#btnNew", function () { if (confirm("Start a brand new game? You'll need to invite your partner again.")) startSetup(); });
+  on("#btnNew", function () {
+    if (solo) { if (confirm("Start a fresh solo game against the bot?")) enterSolo(true); return; }
+    if (confirm("Start a brand new game? You'll need to invite your partner again.")) startSetup();
+  });
+  on("#btnSolo1", function () { store.set("mode", "solo"); enterSolo(false); });
+  on("#btnSolo2", function () { store.set("mode", "solo"); enterSolo(false); });
+  on("#btnExitSolo", function () { store.set("mode", "online"); exitSolo(); });
   on("#btnSetupGo", createGame);
   on("#btnJoin", joinGame);
   on("#btnMain", mainAction);
@@ -939,6 +1125,7 @@
   });
   $("#btnSound").innerHTML = muted ? "&#128263;" : "&#128266;";
 
+  fitScreen();
   if (tg) {
     try {
       tg.ready(); tg.expand();
@@ -960,7 +1147,8 @@
         var id2 = cut > 0 ? rest.slice(0, cut) : rest, inviter = cut > 0 ? unb64url(rest.slice(cut + 1)) : "";
         if (id2 && id2 !== gameId) { showJoin(id2, inviter); return; }
       }
-      if (gameId) watchGame(gameId); else goHome();
+      if (store.get("mode", "online") === "solo") enterSolo(false);
+      else if (gameId) watchGame(gameId); else goHome();
     }).catch(function (e) {
       console.warn(e);
       $("#loadingMsg").textContent = "Couldn't connect. Check your internet and reopen the game.";
