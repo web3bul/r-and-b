@@ -474,3 +474,7 @@ html.tiny .mini-grid.feed, html.tiny .mini-grid.feed .mini-row { gap: 2px; }
   100% { transform: translateY(-85vh) scale(1.15) rotate(18deg); opacity: 0; }
 }
 html.short .react-btn { width: 42px; height: 42px; font-size: 22px; }
+
+/* ---------- v2.10: play totals ---------- */
+.play-totals { align-self: center; padding: 8px 18px; border-radius: 999px; background: rgba(255,255,255,.16); border: 1px solid var(--card-line); font-size: 15px; }
+.play-totals b { color: var(--yellow); font-size: 17px; }
