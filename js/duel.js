@@ -390,6 +390,8 @@ window.RBDuel = function (A) {
   }
   function endFields(d, winner) {
     var G = A.G(), f = { "duel.state": "done", "duel.winner": winner, "duel.endAt": Date.now() };
+    var dw0 = G.dw || [0, 0];
+    f.dd = (G.dd != null ? G.dd : dw0[0] + dw0[1]) + 1; // duels played, draws included
     if (winner >= 0) {
       var dw = (G.dw || [0, 0]).slice(); dw[winner]++; f.dw = dw;
       if (d.stake) f.forfeit = { w: winner, l: A.other(winner), state: "pending", text: "", at: Date.now() };
