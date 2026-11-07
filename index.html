@@ -61,6 +61,12 @@
           </div>
         </div>
 
+        <div class="card forfeit-card" id="forfeitCard" hidden>
+          <div class="ff-title" id="ffTitle"></div>
+          <div class="ff-text" id="ffText"></div>
+          <button class="btn primary" id="btnFfAction" hidden></button>
+        </div>
+
         <div class="status-pill" id="status">Your turn!</div>
 
         <div class="card live-card" id="liveCard" hidden>
@@ -125,9 +131,10 @@
         <button class="btn soft" id="btnSurprise">&#127922; Surprise me</button>
         <button class="btn soft" id="btnPeek">&#128065; Hide</button>
       </div>
-      <label class="field clue-field">Add a clue <small>(optional)</small>
-        <input id="inClue" maxlength="60" placeholder="something in the garden" autocomplete="off">
+      <label class="field clue-field">Clue <small>(filled in for you; edit or clear it)</small>
+        <input id="inClue" maxlength="100" placeholder="something in the garden" autocomplete="off">
       </label>
+      <div class="clue-note" id="clueNote"></div>
       <button class="btn primary big" id="btnSend" disabled>Send it &#128140;</button>
       <div class="keyboard" id="kbSet"></div>
     </section>
@@ -161,6 +168,22 @@
         <div class="taunts" id="taunts"></div>
       </div>
       <button class="btn primary big" id="btnNext">Your turn: set a word</button>
+    </section>
+
+    <!-- FORFEIT WHEEL -->
+    <section class="screen" id="forfeit">
+      <div class="card center">
+        <div class="big-emoji">&#127905;</div>
+        <h2 id="wheelTitle">Pick a forfeit</h2>
+        <p class="muted" id="wheelSub">Spin to choose what they have to do.</p>
+        <div class="slot" id="slot"><span id="slotText">Tap spin 👇</span></div>
+        <button class="btn primary big" id="btnSpin">🎰 Spin</button>
+        <button class="link-btn" id="btnOwnToggle">✍️ Write my own instead</button>
+        <label class="field full" id="ownField" hidden>Your own forfeit
+          <input id="inOwn" maxlength="100" placeholder="Make me jollof this weekend 🍛" autocomplete="off">
+        </label>
+        <button class="btn primary big" id="btnLock" disabled>🔒 Lock it in</button>
+      </div>
     </section>
 
     <!-- SCOREBOARD -->
