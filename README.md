@@ -7,7 +7,7 @@ One player sets a secret word of 3 to 5 letters, and the other gets six guesses 
 ## Rules
 - Points for solving: 6 for 1 guess, 5 for 2, and so on down to 1 for 6 guesses.
 - If the guesser misses, the setter gets +2 for stumping them.
-- Each guess has a 15-second clock. If it runs out, that guess is lost (change `GUESS_SECONDS` in `js/config.js`). Leaving or closing the game pauses the clock, and it picks up where it stopped.
+- Each guess has a 10-second clock. If it runs out, that guess is lost (change `GUESS_SECONDS` in `js/config.js`). Leaving or closing the game pauses the clock, and it picks up where it stopped.
 - When you type your own word, a clue is filled in automatically from the free dictionary at dictionaryapi.dev, with the word itself hidden. You can edit or clear it.
 - **Forfeits**: whoever wins a round spins the forfeit wheel (3 spins, or write your own) and the loser has to do it, then taps "I did it ✅". Edit the list in `FORFEITS` in `js/config.js`.
 - Secret words can be 3, 4 or 5 letters (set `MIN_LEN` / `MAX_LEN` in `js/config.js`). Type 3 or 4 letters and tap Send, or keep typing to 5.

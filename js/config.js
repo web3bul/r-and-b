@@ -10,7 +10,7 @@ window.RB_CONFIG = {
   MAX_GUESSES: 6,
   MIN_LEN: 3,        // shortest secret word allowed
   MAX_LEN: 5,        // longest secret word allowed
-  GUESS_SECONDS: 15, // time allowed for each guess; when it runs out, that guess is lost
+  GUESS_SECONDS: 10, // time allowed for each guess; when it runs out, that guess is lost
   FORFEIT_SPINS: 3,  // the round winner gets this many spins before locking a forfeit in
 
   // Forfeits the round loser has to do. Add, remove or edit freely.
