@@ -228,7 +228,8 @@ window.RBDuel = function (A) {
     renderOpp(d);
     fit();
   }
-  // Opponent's live feed: their letters and colours, plus what they're typing right now.
+  // Opponent's live feed: colours only, never letters (so nobody can copy).
+  // While they type, boxes fill in blank so you can see they're busy.
   function renderOpp(d) {
     var ow = oppWord(d), L = ow.length || 5, orows = rowsOf(d, opp()), og = $("#oppGrid");
     var of = finOf(d, opp()), typing = of ? "" : String((d.typing || {})[opp()] || "").slice(0, L);
@@ -241,11 +242,11 @@ window.RBDuel = function (A) {
       for (var c = 0; c < L; c++) {
         var m = document.createElement("div"); m.className = "mini";
         if (rr) {
-          m.classList.add(rr[c]); m.textContent = g[c] === "." ? "" : g[c];
+          m.classList.add(rr[c]);
           if (A.isBurned(g)) m.classList.add("burned");
           if (r >= oppSeen.rows) { m.classList.add("pop"); m.style.animationDelay = (c * 70) + "ms"; }
         } else if (r === orows.length && typing[c]) {
-          m.textContent = typing[c]; m.classList.add("typing");
+          m.classList.add("typing");
           if (c >= oppSeen.typed.length) m.classList.add("pop");
         }
         mr.appendChild(m);
@@ -263,7 +264,7 @@ window.RBDuel = function (A) {
   function showOops(w) {
     var st = $("#oppStatus");
     clearTimeout(oopsTimer);
-    st.textContent = "🙈 tried \"" + String(w || "").toUpperCase().slice(0, 5) + "\": not a word";
+    st.textContent = "🙈 tried a word that doesn't exist";
     st.classList.add("oops");
     var row = $("#oppTypingRow");
     if (row) { row.classList.remove("shake"); void row.offsetWidth; row.classList.add("shake"); }
@@ -307,7 +308,7 @@ window.RBDuel = function (A) {
     var d = D(), word = myWord(d);
     if (cur.length < word.length) return shake("Not enough letters");
     if (!A.VALID.has(cur)) {
-      var f = {}; f[k("oops", me())] = { w: cur, at: Date.now() }; A.patch(f); // your partner sees the slip
+      var f = {}; f[k("oops", me())] = { at: Date.now() }; A.patch(f); // your partner sees the slip (not the letters)
       return shake("Not in the word list");
     }
     addRow(cur);
