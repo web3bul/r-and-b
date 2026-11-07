@@ -14,7 +14,7 @@ function cleanText(s) {
 }
 
 function buildText(b, name) {
-  const word = /^[a-z]{5}$/.test(String(b.w || "")) ? String(b.w).toUpperCase() : "";
+  const word = /^[a-z]{3,5}$/.test(String(b.w || "")) ? String(b.w).toUpperCase() : "";
   const tries = Number(b.t), pts = Number(b.p);
   switch (b.type) {
     case "joined":
