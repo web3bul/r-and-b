@@ -129,14 +129,11 @@
   function show(id) {
     document.querySelectorAll(".screen").forEach(function (s) { s.classList.toggle("active", s.id === id); });
     screen = id;
-    var canBack = id === "score" || id === "setup" || (id === "set" && G && G.t > 0) || id === "board";
+    var canBack = id === "score" || id === "setup" || (id === "set" && G && G.t > 0) || id === "board" || id === "forfeit";
     $("#btnBack").hidden = !canBack;
     if (tg && tg.BackButton) { try { canBack ? tg.BackButton.show() : tg.BackButton.hide(); } catch (e) {} }
     if (id !== "set" && id !== "board") activeKeyHandler = null;
-    if (id !== "board" && clockTimer) {
-      stopClock(); clearTimeout(typingTimer);
-      if (G && G.phase === "guessing" && guesser() === me) NET.patch(gameId, { typing: "", deadline: 0 }).catch(function () {});
-    }
+    if (id !== "board" && clockTimer) pauseClock();
     window.scrollTo(0, 0);
   }
   function goHome() { renderHome(); show("home"); }
@@ -209,6 +206,8 @@
       ll.innerHTML = "Last turn: " + txt; ll.hidden = false;
     } else ll.hidden = true;
 
+    forfeitCard();
+
     // Status + main button
     var status = $("#status"), btn = $("#btnMain"), title = $("#mainTitle"), sub = $("#mainSub");
     var live = $("#liveCard");
@@ -274,6 +273,10 @@
   // Countdown shown on the watcher's screen, driven by the guesser's deadline.
   function tickLiveClock() {
     var el = $("#liveTimer");
+    if (G && G.phase === "guessing" && guesser() !== me && !G.deadline && G.clockLeft > 0 && !$("#liveCard").hidden) {
+      el.hidden = false; el.classList.remove("urgent");
+      el.textContent = "⏸ Paused · " + Math.ceil(G.clockLeft / 1000) + "s left"; return;
+    }
     if (!G || G.phase !== "guessing" || guesser() === me || !G.deadline || $("#liveCard").hidden) { el.hidden = true; return; }
     var left = Math.ceil((G.deadline - Date.now()) / 1000);
     if (left < 0 || left > CFG.GUESS_SECONDS + 2) { el.hidden = true; return; }
@@ -328,6 +331,17 @@
         if (l.rw >= 0) confetti();
         haptic("warning");
       }
+      // Forfeit updates
+      var pf = prev.forfeit || {}, f = G.forfeit;
+      if (f && f.state === "pending" && pf.at !== f.at && f.w === me && G.last && G.last.g !== me) {
+        toast("🏆 You won the round! Pick " + partnerName() + "'s forfeit 😈"); sfx.win(); confetti();
+      }
+      if (f && f.state === "set" && pf.state !== "set" && f.l === me) {
+        bubble(partnerName() + " picked your forfeit 😈", f.text); sfx.ding(); haptic("warning");
+      }
+      if (f && f.state === "done" && pf.state !== "done" && f.w === me) {
+        toast("✅ " + partnerName() + " says they did the forfeit!"); sfx.ding(); haptic("success");
+      }
     }
     if (first && ["loading", "join", "setup", "home"].indexOf(screen) >= 0) goHome();
     else if (screen === "home") renderHome();
@@ -342,9 +356,11 @@
   setInterval(function () { heartbeat(); if (screen === "home" && G) renderHome(); }, 20000);
   document.addEventListener("visibilitychange", function () {
     if (!gameId || !uid) return;
+    if (document.hidden) pauseClock(); else resumeClock();
     var f = {}; f["seen." + uid] = document.hidden ? 0 : Date.now();
     NET.patch(gameId, f).catch(function () {});
   });
+  window.addEventListener("pagehide", function () { pauseClock(); });
 
   /* ---------- notifications (via the bot) ---------- */
   function notify(payload) {
@@ -441,6 +457,62 @@
 
   /* ---------- SET A WORD ---------- */
   var setWord = "", hideWord = false;
+  // Where the text in the clue box came from: "" (empty), "user", "surprise" or "dict".
+  var clueSource = "", clueFor = "";
+  var CLUE_MAX = 100;
+  var dictCache = {};
+
+  // Look the word up in the free dictionary and turn its definition into a clue,
+  // hiding the word itself so the clue doesn't give it away.
+  function dictionaryClue(word) {
+    if (dictCache[word] !== undefined) return Promise.resolve(dictCache[word]);
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 5000);
+    return fetch("https://api.dictionaryapi.dev/api/v2/entries/en/" + encodeURIComponent(word), ctrl ? { signal: ctrl.signal } : {})
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (data) {
+        clearTimeout(timer);
+        var best = null, order = ["noun", "verb", "adjective", "adverb"];
+        (Array.isArray(data) ? data : []).forEach(function (entry) {
+          (entry.meanings || []).forEach(function (m) {
+            (m.definitions || []).forEach(function (d) {
+              var def = String(d.definition || "").trim();
+              if (!def || def.length < 8) return;
+              var rank = order.indexOf(m.partOfSpeech); if (rank < 0) rank = 9;
+              var score = rank * 1000 + (def.length > 90 ? 500 : 0) + def.length;
+              if (!best || score < best.score) best = { score: score, def: def, pos: m.partOfSpeech };
+            });
+          });
+        });
+        var clue = best ? makeClue(word, best.def, best.pos) : "";
+        dictCache[word] = clue;
+        return clue;
+      })
+      .catch(function () { clearTimeout(timer); return ""; });
+  }
+  function makeClue(word, def, pos) {
+    var stem = word.length > 4 ? word.slice(0, 4) : word;
+    var masked = def.replace(new RegExp("\\b" + stem + "[a-z]*", "gi"), "___");
+    masked = masked.replace(/\s+/g, " ").replace(/\.$/, "");
+    var label = pos ? "(" + pos + ") " : "";
+    var room = CLUE_MAX - label.length;
+    if (masked.length > room) masked = masked.slice(0, room - 1).replace(/\s+\S*$/, "") + "…";
+    return label + masked.charAt(0).toUpperCase() + masked.slice(1);
+  }
+  function maybeAutoClue() {
+    var inp = $("#inClue"), note = $("#clueNote");
+    var ok = setWord.length === 5 && VALID.has(setWord);
+    // Clear a clue that belonged to a different word (unless the user wrote it).
+    if (clueSource && clueSource !== "user" && clueFor !== setWord) { inp.value = ""; clueSource = ""; note.textContent = ""; }
+    if (!ok || clueSource) return;
+    var word = setWord;
+    note.textContent = "📖 Looking up a clue…";
+    dictionaryClue(word).then(function (clue) {
+      if (setWord !== word || clueSource) return; // word changed or user started typing
+      if (clue) { inp.value = clue; clueSource = "dict"; clueFor = word; note.textContent = "📖 Clue from the dictionary. Edit it if you like."; }
+      else note.textContent = "No dictionary clue for this one. Write your own, or leave it blank.";
+    });
+  }
   function renderEntry() {
     var e = $("#entry"); e.innerHTML = "";
     for (var i = 0; i < 5; i++) {
@@ -454,6 +526,7 @@
     else if (ok) { msg.textContent = "✓ Valid word"; msg.classList.add("ok"); }
     else { msg.textContent = "Not in the word list"; msg.classList.add("bad"); }
     $("#btnSend").disabled = !ok;
+    maybeAutoClue();
   }
   function onSetKey(k) {
     if (k === "back") setWord = setWord.slice(0, -1);
@@ -463,7 +536,7 @@
   }
   function startSet() {
     if (!G || G.phase !== "setting" || G.setter !== me) { goHome(); return; }
-    setWord = ""; hideWord = false; $("#inClue").value = "";
+    setWord = ""; hideWord = false; $("#inClue").value = ""; clueSource = ""; clueFor = ""; $("#clueNote").textContent = "";
     $("#btnPeek").textContent = "👁 Hide";
     $("#setTitle").textContent = "Set a word for " + (hasPartner() ? partnerName() : "your partner");
     buildKeyboard($("#kbSet"), onSetKey);
@@ -472,12 +545,13 @@
   }
   function surprise() {
     var pick = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
-    setWord = pick.w; $("#inClue").value = pick.c;
+    setWord = pick.w; $("#inClue").value = pick.c; clueSource = "surprise"; clueFor = pick.w;
+    $("#clueNote").textContent = "";
     sfx.pop(); renderEntry();
   }
   function sendWord() {
     if (setWord.length !== 5 || !VALID.has(setWord) || !G) return;
-    var clue = $("#inClue").value.trim().slice(0, 60);
+    var clue = $("#inClue").value.trim().slice(0, CLUE_MAX);
     $("#btnSend").disabled = true;
     patch({ word: setWord, clue: clue, phase: "guessing", guesses: [], hints: [] }).then(function () {
       if (hasPartner()) { notify({ type: "turn" }); toast("Sent! " + partnerName() + " can play now 💌"); }
@@ -496,21 +570,42 @@
     buildKeyboard($("#kbBoard"), onBoardKey);
     renderBoard(); show("board");
     activeKeyHandler = onBoardKey;
-    startClock();
+    startClock(savedClock());
   }
 
   /* ---------- guess clock ---------- */
+  // The clock pauses when the guesser leaves the board or closes the game,
+  // and picks up from the same second when they come back.
   var clockTimer = null, deadline = 0, lastTickSec = -1;
-  function startClock() {
+  function savedClock() {
+    if (!G) return 0;
+    if (G.clockLeft > 0) return G.clockLeft;                         // paused properly
+    if (G.deadline > 0) return Math.max(3000, G.deadline - Date.now()); // app was killed mid-guess
+    return 0;
+  }
+  function startClock(ms) {
     stopClock();
-    deadline = Date.now() + CFG.GUESS_SECONDS * 1000; lastTickSec = -1;
-    patch({ deadline: deadline, typing: "" });
+    var full = CFG.GUESS_SECONDS * 1000;
+    deadline = Date.now() + (ms > 0 ? Math.min(ms, full) : full); lastTickSec = -1;
+    patch({ deadline: deadline, clockLeft: 0, typing: "" });
     renderClock();
     clockTimer = setInterval(renderClock, 200);
   }
   function stopClock() {
     if (clockTimer) clearInterval(clockTimer);
     clockTimer = null;
+  }
+  function pauseClock() {
+    if (!clockTimer) return;
+    stopClock(); clearTimeout(typingTimer);
+    var left = Math.max(1000, deadline - Date.now());
+    if (G && G.phase === "guessing" && guesser() === me) {
+      G.clockLeft = left; G.deadline = 0;
+      NET.patch(gameId, { clockLeft: left, deadline: 0, typing: "" }).catch(function () {});
+    }
+  }
+  function resumeClock() {
+    if (screen === "board" && !clockTimer && !locked && G && G.phase === "guessing" && guesser() === me) startClock(savedClock());
   }
   function renderClock() {
     var left = Math.max(0, deadline - Date.now()), sec = Math.ceil(left / 1000);
@@ -630,11 +725,14 @@
     var hist = [{ w: word, g: me, t: tries, p: pts, at: now }].concat(G.history || []).slice(0, 40);
     localResult = { w: word, t: tries, p: pts, h: hints.length, rw: rw, s: s };
     sentTaunt = false;
-    patch({
+    var fields = {
       s: s, r: r, last: { g: me, w: word, t: tries, p: pts, rw: rw, at: now }, history: hist,
       phase: "setting", setter: me, word: "", clue: "", guesses: [], hints: [], t: G.t + 1,
-      typing: "", deadline: 0
-    }).then(function () {
+      typing: "", deadline: 0, clockLeft: 0
+    };
+    // The round is over: the winner gets to pick the loser's forfeit.
+    if (rw >= 0) fields.forfeit = { w: rw, l: other(rw), state: "pending", text: "", at: now };
+    patch(fields).then(function () {
       notify({ type: "result", w: word, t: tries, p: pts, rw: rw < 0 ? "" : (rw === me ? "sender" : "you") });
     });
     setTimeout(showResult, solved ? 700 : 300);
@@ -658,6 +756,7 @@
     rr.hidden = !(l.rw >= 0);
     if (l.rw >= 0) rr.textContent = "🏆 " + (l.rw === me ? "You won the round!" : partnerName() + " won the round!") + " Scores reset to 0.";
     $("#rTally").textContent = myName() + " " + l.s[me] + "  ·  " + partnerName() + " " + l.s[other(me)];
+    $("#btnNext").textContent = l.rw === me ? "🎡 Pick " + partnerName() + "'s forfeit" : "Your turn: set a word";
     renderTaunts();
     show("result");
     if (solved) { sfx.win(); haptic("success"); confetti(); } else { sfx.lose(); haptic("warning"); }
@@ -677,6 +776,100 @@
     btn.classList.add("sent"); sfx.pop(); haptic("light");
     toast("Sent to " + partnerName() + " 😏");
     if (!sentTaunt) { sentTaunt = true; notify({ type: "taunt", i: i }); }
+  }
+
+  /* ---------- FORFEITS ---------- */
+  function forfeitCard() {
+    var f = G && G.forfeit, card = $("#forfeitCard"), btn = $("#btnFfAction");
+    if (!f || !hasPartner() || (f.state === "done" && Date.now() - (f.doneAt || 0) > 6 * 3600 * 1000)) { card.hidden = true; return; }
+    card.hidden = false; btn.hidden = true; card.className = "card forfeit-card " + f.state;
+    var winner = f.w === me ? "You" : nameOf(f.w), loser = f.l === me ? "you" : nameOf(f.l);
+    if (f.state === "pending") {
+      if (f.w === me) {
+        $("#ffTitle").textContent = "🏆 You won the round!";
+        $("#ffText").textContent = "Now pick " + partnerName() + "'s forfeit 😈";
+        btn.hidden = false; btn.textContent = "🎡 Spin the forfeit wheel"; btn.dataset.act = "spin";
+      } else {
+        $("#ffTitle").textContent = "😬 " + partnerName() + " won the round";
+        $("#ffText").textContent = "They're picking your forfeit right now…";
+      }
+    } else if (f.state === "set") {
+      if (f.l === me) {
+        $("#ffTitle").textContent = "😈 Your forfeit from " + partnerName();
+        $("#ffText").textContent = f.text;
+        btn.hidden = false; btn.textContent = "I did it ✅"; btn.dataset.act = "done";
+      } else {
+        $("#ffTitle").textContent = "💅 " + partnerName() + " owes you";
+        $("#ffText").textContent = f.text;
+      }
+    } else {
+      $("#ffTitle").textContent = "✅ " + (f.l === me ? "You" : nameOf(f.l)) + " did the forfeit";
+      $("#ffText").textContent = f.text;
+    }
+  }
+  function forfeitAction() {
+    var act = $("#btnFfAction").dataset.act;
+    if (act === "spin") showWheel();
+    else if (act === "done") forfeitDone();
+  }
+
+  var spinsLeft = 0, spinning = false, picked = "";
+  function showWheel() {
+    if (!G || !G.forfeit || G.forfeit.state !== "pending" || G.forfeit.w !== me) { goHome(); return; }
+    spinsLeft = CFG.FORFEIT_SPINS; picked = ""; spinning = false;
+    $("#wheelTitle").textContent = "Pick " + partnerName() + "'s forfeit";
+    $("#wheelSub").textContent = "You get " + spinsLeft + " spins. Or write your own.";
+    $("#slotText").textContent = "Tap spin 👇"; $("#slot").className = "slot";
+    $("#ownField").hidden = true; $("#inOwn").value = "";
+    updateWheelButtons();
+    show("forfeit");
+  }
+  function updateWheelButtons() {
+    var own = !$("#ownField").hidden && $("#inOwn").value.trim();
+    $("#btnSpin").disabled = spinning || spinsLeft <= 0;
+    $("#btnSpin").textContent = spinsLeft === CFG.FORFEIT_SPINS ? "🎰 Spin" : spinsLeft > 0 ? "🎰 Spin again (" + spinsLeft + " left)" : "No spins left";
+    $("#btnLock").disabled = spinning || !(own || picked);
+  }
+  function spin() {
+    if (spinning || spinsLeft <= 0) return;
+    spinning = true; spinsLeft--; $("#ownField").hidden = true;
+    var list = CFG.FORFEITS, slot = $("#slot"), txt = $("#slotText");
+    var final = list[Math.floor(Math.random() * list.length)];
+    if (final === picked && list.length > 1) final = list[(list.indexOf(final) + 1) % list.length];
+    slot.className = "slot spinning"; updateWheelButtons();
+    var steps = 18 + Math.floor(Math.random() * 6), i = 0;
+    (function tick() {
+      i++;
+      if (i >= steps) {
+        txt.textContent = final; picked = final; spinning = false;
+        slot.className = "slot landed"; sfx.win(); haptic("success");
+        updateWheelButtons(); return;
+      }
+      txt.textContent = list[Math.floor(Math.random() * list.length)];
+      beep(500 + (i % 2) * 120, 0.03, "triangle", 0.04);
+      setTimeout(tick, 50 + Math.pow(i / steps, 3) * 380);
+    })();
+  }
+  function lockForfeit() {
+    var own = !$("#ownField").hidden ? $("#inOwn").value.trim().slice(0, 100) : "";
+    var text = own || picked;
+    if (!text || !G || !G.forfeit) return;
+    var f = Object.assign({}, G.forfeit, { state: "set", text: text, setAt: Date.now() });
+    G.forfeit = f;
+    patch({ forfeit: f }).then(function () {
+      notify({ type: "forfeit", text: text });
+      toast("Locked in! " + partnerName() + " can see it now 😈");
+    });
+    sfx.ding(); confetti();
+    goHome();
+  }
+  function forfeitDone() {
+    if (!G || !G.forfeit || G.forfeit.l !== me) return;
+    var f = Object.assign({}, G.forfeit, { state: "done", doneAt: Date.now() });
+    G.forfeit = f;
+    patch({ forfeit: f }).then(function () { notify({ type: "forfeit_done", text: f.text }); });
+    toast("Nice 😅 " + partnerName() + " will see you did it");
+    sfx.ding(); renderHome();
   }
 
   /* ---------- SCOREBOARD ---------- */
@@ -723,7 +916,22 @@
   on("#btnPeek", function () { hideWord = !hideWord; $("#btnPeek").textContent = hideWord ? "👁 Show" : "👁 Hide"; renderEntry(); });
   on("#btnSend", sendWord);
   on("#btnHint", useHint);
-  on("#btnNext", startSet);
+  on("#btnNext", function () {
+    if (G && G.forfeit && G.forfeit.state === "pending" && G.forfeit.w === me) showWheel(); else startSet();
+  });
+  on("#btnFfAction", forfeitAction);
+  on("#btnSpin", spin);
+  on("#btnLock", lockForfeit);
+  on("#btnOwnToggle", function () {
+    var f = $("#ownField"); f.hidden = !f.hidden;
+    if (!f.hidden) setTimeout(function () { $("#inOwn").focus(); }, 50);
+    updateWheelButtons();
+  });
+  $("#inOwn").addEventListener("input", updateWheelButtons);
+  $("#inClue").addEventListener("input", function () {
+    clueSource = this.value.trim() ? "user" : ""; clueFor = setWord;
+    $("#clueNote").textContent = "";
+  });
   on("#btnBack", goHome);
   on("#btnSound", function () {
     muted = !muted; store.set("muted", muted);
