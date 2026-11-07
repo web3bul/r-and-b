@@ -46,6 +46,77 @@
     win: function () { [523, 659, 784, 1047].forEach(function (f, i) { setTimeout(function () { beep(f, 0.18, "triangle", 0.08); }, i * 120); }); },
     lose: function () { [392, 330, 262].forEach(function (f, i) { setTimeout(function () { beep(f, 0.22, "sine", 0.07); }, i * 160); }); }
   };
+  /* ---------- reactions: emojis with sound effects, made on the fly (no audio files) ---------- */
+  var REACTS = { laugh: "😂", cry: "😭", scream: "😱", clap: "👏", clown: "🤡", kiss: "😘" };
+  function audio() {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === "suspended") actx.resume();
+      return actx;
+    } catch (e) { return null; }
+  }
+  function tone(ac, o) { // one shaped note: type, from/to frequency, start, length, volume, optional vibrato and filter
+    var t0 = ac.currentTime + (o.at || 0), osc = ac.createOscillator(), g = ac.createGain(), out = g;
+    osc.type = o.type || "sine";
+    osc.frequency.setValueAtTime(o.f, t0);
+    if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t0 + o.d);
+    if (o.vib) {
+      var lfo = ac.createOscillator(), lg = ac.createGain();
+      lfo.frequency.value = o.vib; lg.gain.value = o.vibAmt || 25;
+      lfo.connect(lg); lg.connect(osc.frequency); lfo.start(t0); lfo.stop(t0 + o.d);
+    }
+    if (o.bp) { var f = ac.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = o.bp; f.Q.value = o.q || 1.5; osc.connect(f); f.connect(g); }
+    else osc.connect(g);
+    var v = o.v || 0.08;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(v, t0 + Math.min(0.02, o.d / 4));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + o.d);
+    out.connect(ac.destination); osc.start(t0); osc.stop(t0 + o.d + 0.02);
+  }
+  function noise(ac, at, d, v, bp) { // a short burst of noise (claps, breath)
+    var n = Math.floor(ac.sampleRate * d), buf = ac.createBuffer(1, n, ac.sampleRate), data = buf.getChannelData(0);
+    for (var i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    var src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(), t0 = ac.currentTime + at;
+    src.buffer = buf; f.type = "bandpass"; f.frequency.value = bp || 1500; f.Q.value = 1;
+    g.gain.value = v || 0.3; src.connect(f); f.connect(g); g.connect(ac.destination); src.start(t0);
+  }
+  function reactSound(kind) {
+    if (muted) return;
+    var ac = audio(); if (!ac) return;
+    try {
+      if (kind === "laugh") [560, 500, 450, 410, 380].forEach(function (f, i) { tone(ac, { type: "sawtooth", f: f, to: f * 0.85, at: i * 0.13, d: 0.1, v: 0.09, bp: 900, q: 2 }); });
+      else if (kind === "cry") { tone(ac, { type: "triangle", f: 620, to: 380, d: 0.55, v: 0.1, vib: 7, vibAmt: 30 }); tone(ac, { type: "triangle", f: 560, to: 340, at: 0.6, d: 0.6, v: 0.09, vib: 7, vibAmt: 30 }); }
+      else if (kind === "scream") { tone(ac, { type: "sawtooth", f: 700, to: 1500, d: 0.7, v: 0.07, vib: 11, vibAmt: 60, bp: 1800, q: 1 }); noise(ac, 0, 0.6, 0.08, 3000); }
+      else if (kind === "clap") for (var i = 0; i < 6; i++) noise(ac, i * 0.11 + Math.random() * 0.02, 0.07, 0.5, 1400);
+      else if (kind === "clown") { tone(ac, { type: "square", f: 300, to: 260, d: 0.16, v: 0.07, bp: 700 }); tone(ac, { type: "square", f: 300, to: 260, at: 0.22, d: 0.2, v: 0.07, bp: 700 }); }
+      else if (kind === "kiss") { tone(ac, { type: "sine", f: 900, to: 2400, d: 0.08, v: 0.1 }); noise(ac, 0.07, 0.03, 0.25, 2500); }
+    } catch (e) {}
+  }
+  // Big emojis floating up the screen.
+  function floatReact(kind, small) {
+    var box = $("#floaters"); if (!box) return;
+    var n = small ? 3 : 7;
+    for (var i = 0; i < n; i++) (function (i) {
+      setTimeout(function () {
+        var s = document.createElement("span"); s.className = "floater"; s.textContent = REACTS[kind] || "😂";
+        s.style.left = (10 + Math.random() * 80) + "%";
+        s.style.fontSize = (small ? 30 : 38 + Math.random() * 26) + "px";
+        s.style.animationDuration = (1.6 + Math.random() * 0.9) + "s";
+        box.appendChild(s);
+        setTimeout(function () { s.remove(); }, 2700);
+      }, i * 90);
+    })(i);
+  }
+  var lastReactAt = 0;
+  function sendReact(kind) {
+    if (!REACTS[kind] || !G) return;
+    var now = Date.now();
+    reactSound(kind); floatReact(kind, true); haptic("light");
+    if (now - lastReactAt < 350) return; // don't flood the database when tapping fast
+    lastReactAt = now;
+    patch({ react: { from: me, e: kind, at: now } });
+  }
+
   function haptic(kind) {
     try {
       if (!tg || !tg.HapticFeedback) return;
@@ -94,6 +165,7 @@
   var screen = "loading";
   var localResult = null;    // my most recent result, for the result screen
   var seenTaunt = store.get("seenTaunt", 0);
+  var seenReact = Date.now();  // only show reactions sent after the app opened
   var sentTaunt = false;
 
   function other(i) { return i === 0 ? 1 : 0; }
@@ -327,6 +399,11 @@
     if (G.taunt && G.taunt.from !== me && G.taunt.at > seenTaunt) {
       seenTaunt = G.taunt.at; store.set("seenTaunt", seenTaunt);
       if (Date.now() - G.taunt.at < 10 * 60 * 1000) { bubble(partnerName() + " says", G.taunt.text || TAUNTS[G.taunt.i] || ""); sfx.pop(); haptic("light"); }
+    }
+    // Partner's emoji reaction: big floating emojis + its sound, on whatever screen you're on.
+    if (G.react && G.react.from !== me && G.react.at > seenReact) {
+      seenReact = G.react.at;
+      if (Date.now() - G.react.at < 15000) { floatReact(G.react.e, false); reactSound(G.react.e); haptic("light"); }
     }
     if (!first && prev) {
       // Partner joined
@@ -1189,6 +1266,9 @@
   });
   on("#btnDuel", function () { if (duel) duel.onHomeButton(); });
   on("#btnFfAction", forfeitAction);
+  document.querySelectorAll(".react-btn").forEach(function (b) {
+    b.addEventListener("click", function () { sendReact(b.dataset.e); b.classList.remove("tap"); void b.offsetWidth; b.classList.add("tap"); });
+  });
   on("#btnSpin", spin);
   on("#btnLock", lockForfeit);
   on("#btnOwnToggle", function () {
