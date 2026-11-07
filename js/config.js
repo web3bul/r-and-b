@@ -8,6 +8,8 @@ window.RB_CONFIG = {
   POINTS_TO_WIN: 30,
   STUMP_BONUS: 2,
   MAX_GUESSES: 6,
+  MIN_LEN: 3,        // shortest secret word allowed
+  MAX_LEN: 5,        // longest secret word allowed
   GUESS_SECONDS: 15, // time allowed for each guess; when it runs out, that guess is lost
   FORFEIT_SPINS: 3,  // the round winner gets this many spins before locking a forfeit in
 
@@ -33,6 +35,23 @@ window.RB_CONFIG = {
     "Bring the winner breakfast in bed ☕",
     "Say \"You're the smartest person I know\" in a voice note 🧠",
     "Give the winner a big hug and 10 kisses 😘"
+  ],
+
+  // Solo mode: what the bot says, and the dares it gives you if it wins a round.
+  BOT_NAME: "R&B Bot 🤖",
+  BOT_TAUNTS_WIN: ["Beep boop. Too easy 🤖", "My circuits are warming up 🔥", "Is that all you've got? 😏", "Calculated. 🧠"],
+  BOT_TAUNTS_LOSE: ["Okay, you got me 😅", "Recalculating… 🤖", "That word was evil 😤", "Rematch. Now. 🔥"],
+  SOLO_DARES: [
+    "Send a sweet text to someone you love 💌",
+    "Do 15 push-ups 💪",
+    "Drink a full glass of water 💧",
+    "Dance to your favourite song for 1 minute 💃",
+    "Tell someone a joke today 😂",
+    "Tidy up around you for 5 minutes 🧹",
+    "Take your silliest selfie 🤪",
+    "Give someone a genuine compliment today 🌟",
+    "Sing your favourite chorus out loud 🎤",
+    "Stretch for 2 minutes 🧘"
   ],
 
   // Firebase project (safe to be public: it identifies the project, it isn't a password)

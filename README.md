@@ -2,7 +2,7 @@
 
 A Wordle-style word game for two, played live as a Telegram Mini App.
 
-One player sets a secret five-letter word, and the other gets six guesses to find it. Then you swap. The first to 30 points wins the round.
+One player sets a secret word of 3 to 5 letters, and the other gets six guesses to find it. Then you swap. The first to 30 points wins the round.
 
 ## Rules
 - Points for solving: 6 for 1 guess, 5 for 2, and so on down to 1 for 6 guesses.
@@ -10,6 +10,8 @@ One player sets a secret five-letter word, and the other gets six guesses to fin
 - Each guess has a 15-second clock. If it runs out, that guess is lost (change `GUESS_SECONDS` in `js/config.js`). Leaving or closing the game pauses the clock, and it picks up where it stopped.
 - When you type your own word, a clue is filled in automatically from the free dictionary at dictionaryapi.dev, with the word itself hidden. You can edit or clear it.
 - **Forfeits**: whoever wins a round spins the forfeit wheel (3 spins, or write your own) and the loser has to do it, then taps "I did it ✅". Edit the list in `FORFEITS` in `js/config.js`.
+- Secret words can be 3, 4 or 5 letters (set `MIN_LEN` / `MAX_LEN` in `js/config.js`). Type 3 or 4 letters and tap Send, or keep typing to 5.
+- **Solo mode**: play against the R&B Bot. It sets you words with clues, then guesses yours live while you watch. If it wins a round, it gives you a dare. Everything stays on your phone.
 - A hint reveals one letter and costs 1 point.
 - When you set a word, you can add a clue or tap **Surprise me** for a random word with an automatic clue.
 - After each result, you can send a taunt, and your partner sees it straight away.

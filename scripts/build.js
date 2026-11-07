@@ -31,13 +31,13 @@ esbuild.buildSync({
 fs.copyFileSync(path.join(dist, "js/net.js"), path.join(root, "js/net.js")); // handy for local testing
 
 const wordsFile = require.resolve("word-list/words.txt");
-const words = fs.readFileSync(wordsFile, "utf8").split("\n").filter((w) => /^[a-z]{5}$/.test(w));
+const words = fs.readFileSync(wordsFile, "utf8").split("\n").filter((w) => /^[a-z]{3,5}$/.test(w));
 global.window = {};
 eval(fs.readFileSync(path.join(root, "js/answers.js"), "utf8"));
 const all = new Set(words);
 window.RB_ANSWERS.forEach((a) => all.add(a.w));
 const list = [...all].sort();
-const out = "// All five-letter words accepted as guesses (generated at build time).\nwindow.RB_VALID=\"" + list.join(" ") + "\".split(\" \");\n";
+const out = "// All 3- to 5-letter words accepted as guesses (generated at build time).\nwindow.RB_VALID=\"" + list.join(" ") + "\".split(\" \");\n";
 fs.writeFileSync(path.join(dist, "js/valid.js"), out);
 fs.writeFileSync(path.join(root, "js/valid.js"), out);
 
