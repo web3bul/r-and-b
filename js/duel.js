@@ -14,6 +14,8 @@ window.RBDuel = function (A) {
   var cur = "", locked = false;
   var clock = null, deadline = 0, lastTick = -1;
   var shownResultFor = null;
+  var oppSeen = { id: null, rows: 0, typed: "", oops: 0 }; // what we've already animated in the live feed
+  var typingTimer = null, oopsTimer = null;
 
   function D() { var G = A.G(); return G && G.duel; }
   function me() { return A.me(); }
@@ -154,6 +156,9 @@ window.RBDuel = function (A) {
     if ((d.state === "countdown" || d.state === "live") && cdFor !== d.id && !finOf(d, me())) {
       if (!first || Date.now() - (d.go || 0) < 15000) openRace(true);
     }
+    var oo = (d.oops || {})[opp()];
+    if (oo && oo.at > oppSeen.oops && oppSeen.id === d.id && A.screen() === "duel" && d.state !== "done") showOops(oo.w);
+    if (oo && oo.at > oppSeen.oops) oppSeen.oops = oo.at;
     if (A.screen() === "duel") renderRace();
     if (d.state === "done" && shownResultFor !== d.id && (A.screen() === "duel" || (!first && pd && pd.state !== "done"))) {
       if (A.screen() !== "duel") A.show("duel");
@@ -213,19 +218,54 @@ window.RBDuel = function (A) {
       grid.appendChild(row);
     }
     paintKeys(d, word, rows);
-    // Opponent: colours only, no letters
-    var ow = oppWord(d), orows = rowsOf(d, opp()), og = $("#oppGrid"); og.innerHTML = "";
-    for (var r2 = 0; r2 < CFG.MAX_GUESSES; r2++) {
+    renderOpp(d);
+    fit();
+  }
+  // Opponent's live feed: their letters and colours, plus what they're typing right now.
+  function renderOpp(d) {
+    var ow = oppWord(d), L = ow.length || 5, orows = rowsOf(d, opp()), og = $("#oppGrid");
+    var of = finOf(d, opp()), typing = of ? "" : String((d.typing || {})[opp()] || "").slice(0, L);
+    if (oppSeen.id !== d.id) oppSeen = { id: d.id, rows: orows.length, typed: "", oops: ((d.oops || {})[opp()] || {}).at || 0 };
+    og.innerHTML = ""; og.style.setProperty("--cols", L);
+    for (var r = 0; r < CFG.MAX_GUESSES; r++) {
       var mr = document.createElement("div"); mr.className = "mini-row";
-      var rr = orows[r2] && ow ? A.scoreGuess(orows[r2], ow) : null;
-      for (var c2 = 0; c2 < (ow.length || 5); c2++) {
-        var m = document.createElement("div"); m.className = "mini" + (rr ? " " + rr[c2] : ""); mr.appendChild(m);
+      if (r === orows.length && !of) mr.id = "oppTypingRow";
+      var g = orows[r], rr = g && ow ? A.scoreGuess(g, ow) : null;
+      for (var c = 0; c < L; c++) {
+        var m = document.createElement("div"); m.className = "mini";
+        if (rr) {
+          m.classList.add(rr[c]); m.textContent = g[c] === "." ? "" : g[c];
+          if (A.isBurned(g)) m.classList.add("burned");
+          if (r >= oppSeen.rows) { m.classList.add("pop"); m.style.animationDelay = (c * 70) + "ms"; }
+        } else if (r === orows.length && typing[c]) {
+          m.textContent = typing[c]; m.classList.add("typing");
+          if (c >= oppSeen.typed.length) m.classList.add("pop");
+        }
+        mr.appendChild(m);
       }
       og.appendChild(mr);
     }
-    var of = finOf(d, opp());
-    $("#oppStatus").textContent = of ? (of.solved ? "✅ Solved in " + of.t + "!" : of.resigned ? "🏳️ Gave up" : "❌ Out of guesses") : orows.length + "/" + CFG.MAX_GUESSES + " guesses";
-    fit();
+    oppSeen.rows = orows.length; oppSeen.typed = typing;
+    if (oopsTimer) return; // keep the "not a word" message up for a moment
+    var last = orows[orows.length - 1];
+    $("#oppStatus").textContent = of ? (of.solved ? "✅ Solved in " + of.t + "!" : of.resigned ? "🏳️ Gave up" : "❌ Out of guesses")
+      : typing ? "typing… ✍️"
+      : last && A.isBurned(last) ? "⏱ ran out of time!"
+      : orows.length + "/" + CFG.MAX_GUESSES + " guesses";
+  }
+  function showOops(w) {
+    var st = $("#oppStatus");
+    clearTimeout(oopsTimer);
+    st.textContent = "🙈 tried \"" + String(w || "").toUpperCase().slice(0, 5) + "\": not a word";
+    st.classList.add("oops");
+    var row = $("#oppTypingRow");
+    if (row) { row.classList.remove("shake"); void row.offsetWidth; row.classList.add("shake"); }
+    A.beep(300, 0.08, "triangle", 0.04);
+    oopsTimer = setTimeout(function () { oopsTimer = null; st.classList.remove("oops"); var d = D(); if (d) renderOpp(d); }, 2200);
+  }
+  function sendTyping() {
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(function () { var f = {}; f[k("typing", me())] = cur; A.patch(f); }, 120);
   }
   function paintKeys(d, word, rows) {
     var best = {}, rank = { x: 1, y: 2, g: 3 };
@@ -247,9 +287,9 @@ window.RBDuel = function (A) {
     var d = D();
     if (!live || locked || !d || d.state === "done" || finOf(d, me())) return;
     var L = myWord(d).length;
-    if (key === "back") { cur = cur.slice(0, -1); A.sfx.key(); renderRace(); return; }
+    if (key === "back") { cur = cur.slice(0, -1); A.sfx.key(); renderRace(); sendTyping(); return; }
     if (key === "enter") return submit();
-    if (cur.length < L) { cur += key; A.sfx.key(); A.haptic("light"); renderRace(); }
+    if (cur.length < L) { cur += key; A.sfx.key(); A.haptic("light"); renderRace(); sendTyping(); }
   }
   function shake(msg) {
     var rows = document.querySelectorAll("#dGrid .row"), d = D(), row = rows[rowsOf(d, me()).length];
@@ -259,13 +299,17 @@ window.RBDuel = function (A) {
   function submit() {
     var d = D(), word = myWord(d);
     if (cur.length < word.length) return shake("Not enough letters");
-    if (!A.VALID.has(cur)) return shake("Not in the word list");
+    if (!A.VALID.has(cur)) {
+      var f = {}; f[k("oops", me())] = { w: cur, at: Date.now() }; A.patch(f); // your partner sees the slip
+      return shake("Not in the word list");
+    }
     addRow(cur);
   }
   function addRow(guess) {
     var d = D(), word = myWord(d);
     var rows = rowsOf(d, me()).concat([guess]);
-    var f = {}; f[k("rows", me())] = rows;
+    var f = {}; f[k("rows", me())] = rows; f[k("typing", me())] = "";
+    clearTimeout(typingTimer);
     d.rows = d.rows || {}; d.rows[me()] = rows; cur = "";
     stopClock(); locked = true;
     A.patch(f);

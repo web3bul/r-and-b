@@ -427,3 +427,17 @@ html.tiny .btn.chip { padding: 5px 10px; }
   background: rgba(30,6,50,.72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 .countdown span { font-size: 120px; font-weight: 700; color: #fff; text-shadow: 0 8px 0 rgba(0,0,0,.25); animation: cdPop .9s ease; }
 @keyframes cdPop { 0% { transform: scale(.3); opacity: 0; } 30% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+/* ---------- v2.5: duel live feed (opponent's letters + typing) ---------- */
+.duel-top { align-items: flex-start; }
+.opp { align-items: flex-start; }
+.opp-head { min-width: 0; max-width: 130px; }
+.opp-head span { line-height: 1.25; }
+.opp-head span.oops { color: #ffb3b3; font-weight: 600; }
+.mini-grid.feed { gap: 3px; }
+.mini-grid.feed .mini-row { gap: 3px; justify-content: flex-start; }
+.mini-grid.feed .mini { width: 19px; height: 19px; border-radius: 5px; font-size: 11px; line-height: 1; }
+.mini-grid.feed .mini.burned { background: rgba(0,0,0,.25); border: 1px dashed rgba(255,255,255,.25); }
+.mini-grid.feed .mini.typing { border-width: 1.5px; }
+html.tiny .mini-grid.feed .mini { width: 16px; height: 16px; font-size: 10px; }
+html.tiny .mini-grid.feed, html.tiny .mini-grid.feed .mini-row { gap: 2px; }
