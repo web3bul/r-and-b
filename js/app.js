@@ -657,16 +657,33 @@
     clearTimeout(typingTimer);
     typingTimer = setTimeout(function () { if (screen === "board") NET.patch(gameId, { typing: cur }).catch(function () {}); }, 120);
   }
-  // Letters already found in the right spot (from earlier guesses or hints): position -> letter.
-  function knownGreens(rows, word, hints) {
-    var k = {};
-    rows.forEach(function (g) { if (isBurned(g)) return; scoreGuess(g, word).forEach(function (r, i) { if (r === "g") k[i] = word[i]; }); });
-    (hints || []).forEach(function (i) { k[i] = word[i]; });
-    return k;
+  // A guide for the row you're about to type, built only from what your earlier guesses
+  // already showed: green letters go back in their spot, and each yellow letter is placed
+  // in an open spot it hasn't been tried in yet (a suggestion, not the answer).
+  // Returns { slots: {pos: {ch, kind: "g"|"y"}}, present: {letter: 1} }.
+  function guideRow(rows, word, hints) {
+    var L = word.length, slots = {}, tried = {}, present = {}, yellows = [];
+    rows.forEach(function (g) {
+      if (isBurned(g)) return;
+      scoreGuess(g, word).forEach(function (r, i) {
+        var ch = g[i];
+        tried[ch + i] = 1;
+        if (r === "g") { slots[i] = { ch: ch, kind: "g" }; present[ch] = 1; }
+        else if (r === "y") { present[ch] = 1; if (yellows.indexOf(ch) < 0) yellows.push(ch); }
+      });
+    });
+    (hints || []).forEach(function (i) { slots[i] = { ch: word[i], kind: "g" }; present[word[i]] = 1; });
+    yellows.forEach(function (ch) {
+      var greensOfCh = 0, inWord = 0;
+      for (var i = 0; i < L; i++) { if (slots[i] && slots[i].kind === "g" && slots[i].ch === ch) greensOfCh++; if (word[i] === ch) inWord++; }
+      if (greensOfCh >= inWord) return; // already found every copy of this letter
+      for (var p = 0; p < L; p++) if (!slots[p] && !tried[ch + p]) { slots[p] = { ch: ch, kind: "y" }; return; }
+    });
+    return { slots: slots, present: present };
   }
   function renderBoard(animateRow) {
     var L = wordLen(), rows = G.guesses || [], hints = G.hints || [], grid = $("#grid"); grid.innerHTML = "";
-    var known = knownGreens(rows, G.word, hints);
+    var guide = guideRow(rows, G.word, hints);
     grid.style.setProperty("--cols", L);
     for (var r = 0; r < CFG.MAX_GUESSES; r++) {
       var row = document.createElement("div"); row.className = "row";
@@ -683,8 +700,13 @@
             })(t, res[c], c * 160);
           } else t.classList.add(res[c]);
         } else if (r === rows.length) {
-          if (cur[c]) { t.textContent = cur[c]; t.classList.add("filled"); if (known[c] && cur[c] === known[c]) t.classList.add("known"); }
-          else if (known[c]) { t.classList.add("known-slot"); t.innerHTML = '<span class="hl">' + known[c] + "</span>"; }
+          var gs = guide.slots[c];
+          if (cur[c]) {
+            t.textContent = cur[c]; t.classList.add("filled");
+            if (gs && gs.kind === "g" && cur[c] === gs.ch) t.classList.add("known");
+            else if (guide.present[cur[c]]) t.classList.add("known-y");
+          }
+          else if (gs) { t.classList.add(gs.kind === "g" ? "known-slot" : "maybe-slot"); t.innerHTML = '<span class="hl">' + gs.ch + "</span>"; }
         }
         row.appendChild(t);
       }
@@ -1204,7 +1226,7 @@
     screen: function () { return screen; }, other: other, partnerName: partnerName, hasPartner: hasPartner,
     patch: patch, notify: notify, toast: toast, bubble: bubble, sfx: sfx, beep: beep, haptic: haptic,
     confetti: confetti, esc: esc, show: show, goHome: goHome, buildKeyboard: buildKeyboard,
-    scoreGuess: scoreGuess, isBurned: isBurned, viewH: viewH, startSet: startSet,
+    scoreGuess: scoreGuess, isBurned: isBurned, viewH: viewH, startSet: startSet, guideRow: guideRow,
     setKeyHandler: function (fn) { activeKeyHandler = fn; }
   }) : null;
 
