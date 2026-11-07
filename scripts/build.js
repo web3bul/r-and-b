@@ -13,7 +13,12 @@ fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(path.join(dist, "js"), { recursive: true });
 fs.mkdirSync(path.join(dist, "css"), { recursive: true });
 
-fs.copyFileSync(path.join(root, "index.html"), path.join(dist, "index.html"));
+// Stamp a version on every CSS/JS link so Telegram's in-app browser fetches fresh files after each update.
+const ver = Date.now().toString(36);
+const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
+  .replace(/(href="css\/[^"?]+\.css)"/g, "$1?v=" + ver + '"')
+  .replace(/(src="js\/[^"?]+\.js)"/g, "$1?v=" + ver + '"');
+fs.writeFileSync(path.join(dist, "index.html"), html);
 fs.copyFileSync(path.join(root, "css/style.css"), path.join(dist, "css/style.css"));
 for (const f of ["app.js", "duel.js", "answers.js", "config.js", "mock.js"]) {
   fs.copyFileSync(path.join(root, "js", f), path.join(dist, "js", f));
