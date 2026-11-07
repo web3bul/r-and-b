@@ -185,6 +185,14 @@
     var t = G.seen && G.seen[G.uids[i]];
     return !!t && Date.now() - t < ONLINE_MS;
   }
+  // Lifetime counts per player: words guessed (pl) and words solved (sv). History keeps only the
+  // last 40 words, so these are stored separately; the first time, they're seeded from history.
+  function lifetime(key, solvedOnly) {
+    if (G[key]) return G[key].slice();
+    var out = [0, 0];
+    (G.history || []).forEach(function (h) { if (!solvedOnly || h.t > 0) out[h.g]++; });
+    return out;
+  }
   function okWord(w) { return w.length >= CFG.MIN_LEN && w.length <= CFG.MAX_LEN && VALID.has(w); }
   function isBurned(row) { return /^\.+$/.test(row); }
   function wordLen() { return (G && G.word && G.word.length) || CFG.MAX_LEN; }
@@ -879,10 +887,11 @@
     if (rw >= 0) { r[rw]++; s = [0, 0]; }
     var now = Date.now(), word = G.word;
     var hist = [{ w: word, g: me, t: tries, p: pts, at: now }].concat(G.history || []).slice(0, 40);
+    var pl = lifetime("pl"), sv = lifetime("sv", true); pl[me]++; if (solved) sv[me]++;
     localResult = { w: word, t: tries, p: pts, h: hints.length, rw: rw, s: s, solved: solved };
     sentTaunt = false;
     var fields = {
-      s: s, r: r, last: { g: me, w: word, t: tries, p: pts, rw: rw, at: now }, history: hist,
+      s: s, r: r, last: { g: me, w: word, t: tries, p: pts, rw: rw, at: now }, history: hist, pl: pl, sv: sv,
       phase: "setting", setter: me, word: "", clue: "", guesses: [], hints: [], t: G.t + 1,
       typing: "", deadline: 0, clockLeft: 0
     };
@@ -1197,9 +1206,10 @@
     if (rw >= 0) { r[rw]++; s = [0, 0]; }
     var now = Date.now(), word = G.word;
     var lines = solved ? CFG.BOT_TAUNTS_WIN : CFG.BOT_TAUNTS_LOSE;
+    var pl = lifetime("pl"), sv = lifetime("sv", true); pl[g]++; if (solved) sv[g]++;
     var fields = {
       s: s, r: r, last: { g: g, w: word, t: tries, p: pts, rw: rw, at: now },
-      history: [{ w: word, g: g, t: tries, p: pts, at: now }].concat(G.history || []).slice(0, 40),
+      history: [{ w: word, g: g, t: tries, p: pts, at: now }].concat(G.history || []).slice(0, 40), pl: pl, sv: sv,
       phase: "setting", setter: g, word: "", clue: "", guesses: [], hints: [], t: G.t + 1,
       typing: "", deadline: 0, clockLeft: 0,
       taunt: { from: g, text: lines[Math.floor(Math.random() * lines.length)], at: now + 1500 }
@@ -1221,12 +1231,17 @@
       return { played: mine.length, solved: solved.length, streak: streak, avg: avg, best: best };
     }
     var A = statsFor(me), B = statsFor(other(me));
+    var pl = lifetime("pl"), sv = lifetime("sv", true);
+    A.played = pl[me]; A.solved = sv[me]; B.played = pl[other(me)]; B.solved = sv[other(me)];
+    var dw = G.dw || [0, 0], duels = G.dd != null ? G.dd : dw[0] + dw[1];
+    $("#playTotals").innerHTML = "<b>" + (G.t || 0) + "</b> word" + (G.t === 1 ? "" : "s") + " played" + (solo ? "" : " · <b>" + duels + "</b> duel" + (duels === 1 ? "" : "s"));
     function bestTxt(v) { return v === "–" ? "–" : v + " guess" + (v === 1 ? "" : "es"); }
     var rows = [
       ["🏆 Round wins", G.r[me], G.r[other(me)]],
       ["⚡ Duel wins", (G.dw || [0, 0])[me], (G.dw || [0, 0])[other(me)]],
       ["⭐ Points this round", G.s[me], G.s[other(me)]],
       ["🔥 Solve streak", A.streak, B.streak],
+      ["🎮 Words guessed", A.played, B.played],
       ["✅ Words solved", A.solved + "/" + A.played, B.solved + "/" + B.played],
       ["🎯 Avg guesses", A.avg, B.avg],
       ["⚡ Best game", bestTxt(A.best), bestTxt(B.best)]
