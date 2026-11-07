@@ -132,7 +132,7 @@
   function show(id) {
     document.querySelectorAll(".screen").forEach(function (s) { s.classList.toggle("active", s.id === id); });
     screen = id;
-    var canBack = id === "score" || id === "setup" || (id === "set" && G && G.t > 0) || id === "board" || id === "forfeit";
+    var canBack = id === "score" || id === "setup" || (id === "set" && (G && G.t > 0 || setPurpose === "duel")) || id === "board" || id === "forfeit" || id === "duel" || id === "duelSetup";
     $("#btnBack").hidden = !canBack;
     if (tg && tg.BackButton) { try { canBack ? tg.BackButton.show() : tg.BackButton.hide(); } catch (e) {} }
     if (id !== "set" && id !== "board") activeKeyHandler = null;
@@ -140,6 +140,10 @@
     window.scrollTo(0, 0);
   }
   function goHome() { renderHome(); show("home"); }
+  function goBack() {
+    if (screen === "duel" && duel && duel.onBack()) return; // stayed in the duel
+    goHome();
+  }
 
   /* ---------- keyboard ---------- */
   var ROWS = ["qwertyuiop", "asdfghjkl", "+zxcvbnm-"];
@@ -211,6 +215,7 @@
     } else ll.hidden = true;
 
     forfeitCard();
+    if (duel) duel.renderCard();
 
     // Status + main button
     var status = $("#status"), btn = $("#btnMain"), title = $("#mainTitle"), sub = $("#mainSub");
@@ -292,7 +297,7 @@
   setInterval(function () { if (screen === "home" && G) tickLiveClock(); }, 250);
   function mainAction() {
     if (!G) return;
-    if (G.phase === "setting" && G.setter === me) startSet();
+    if (G.phase === "setting" && G.setter === me) startSet("turn");
     else if (G.phase === "guessing" && guesser() === me) startBoard();
   }
 
@@ -353,6 +358,7 @@
     else if (screen === "home") renderHome();
     if (first) heartbeat();
     if (solo) botTick();
+    if (duel) duel.onUpdate(prev, first);
   }
 
   /* ---------- presence ---------- */
@@ -433,7 +439,7 @@
     NET.create(id, doc).then(function () {
       G = doc; me = 0; gameId = id;
       watchGame(id);
-      setTimeout(startSet, 150);
+      setTimeout(function () { startSet("turn"); }, 150);
     }).catch(function (e) { console.warn(e); toast("Couldn't create the game. Try again."); })
       .then(function () { $("#btnSetupGo").disabled = false; });
   }
@@ -465,7 +471,7 @@
   }
 
   /* ---------- SET A WORD ---------- */
-  var setWord = "", hideWord = false;
+  var setWord = "", hideWord = false, setPurpose = "turn";
   // Where the text in the clue box came from: "" (empty), "user", "surprise" or "dict".
   var clueSource = "", clueFor = "";
   var CLUE_MAX = 100;
@@ -546,11 +552,13 @@
     else if (setWord.length < CFG.MAX_LEN) setWord += k;
     sfx.key(); haptic("light"); renderEntry();
   }
-  function startSet() {
-    if (!G || G.phase !== "setting" || G.setter !== me) { goHome(); return; }
+  function startSet(purpose) {
+    setPurpose = purpose === "duel" ? "duel" : "turn";
+    if (setPurpose === "duel") { if (!G || !G.duel || G.duel.state !== "setting") { goHome(); return; } }
+    else if (!G || G.phase !== "setting" || G.setter !== me) { goHome(); return; }
     setWord = ""; hideWord = false; $("#inClue").value = ""; clueSource = ""; clueFor = ""; $("#clueNote").textContent = "";
     $("#btnPeek").textContent = "👁 Hide";
-    $("#setTitle").textContent = "Set a word for " + (hasPartner() ? partnerName() : "your partner");
+    $("#setTitle").textContent = setPurpose === "duel" ? "⚡ Your duel word for " + partnerName() : "Set a word for " + (hasPartner() ? partnerName() : "your partner");
     buildKeyboard($("#kbSet"), onSetKey);
     renderEntry(); show("set");
     activeKeyHandler = onSetKey;
@@ -564,6 +572,7 @@
   function sendWord() {
     if (!okWord(setWord) || !G) return;
     var clue = $("#inClue").value.trim().slice(0, CLUE_MAX);
+    if (setPurpose === "duel") { duel.submitWord(setWord, clue); return; }
     $("#btnSend").disabled = true;
     patch({ word: setWord, clue: clue, phase: "guessing", guesses: [], hints: [] }).then(function () {
       if (hasPartner()) { notify({ type: "turn" }); toast("Sent! " + partnerName() + " can play now 💌"); }
@@ -1068,6 +1077,7 @@
     function bestTxt(v) { return v === "–" ? "–" : v + " guess" + (v === 1 ? "" : "es"); }
     var rows = [
       ["🏆 Round wins", G.r[me], G.r[other(me)]],
+      ["⚡ Duel wins", (G.dw || [0, 0])[me], (G.dw || [0, 0])[other(me)]],
       ["⭐ Points this round", G.s[me], G.s[other(me)]],
       ["🔥 Solve streak", A.streak, B.streak],
       ["✅ Words solved", A.solved + "/" + A.played, B.solved + "/" + B.played],
@@ -1103,8 +1113,9 @@
   on("#btnSend", sendWord);
   on("#btnHint", useHint);
   on("#btnNext", function () {
-    if (G && G.forfeit && G.forfeit.state === "pending" && G.forfeit.w === me) showWheel(); else startSet();
+    if (G && G.forfeit && G.forfeit.state === "pending" && G.forfeit.w === me) showWheel(); else startSet("turn");
   });
+  on("#btnDuel", function () { if (duel) duel.onHomeButton(); });
   on("#btnFfAction", forfeitAction);
   on("#btnSpin", spin);
   on("#btnLock", lockForfeit);
@@ -1118,7 +1129,7 @@
     clueSource = this.value.trim() ? "user" : ""; clueFor = setWord;
     $("#clueNote").textContent = "";
   });
-  on("#btnBack", goHome);
+  on("#btnBack", goBack);
   on("#btnSound", function () {
     muted = !muted; store.set("muted", muted);
     $("#btnSound").innerHTML = muted ? "&#128263;" : "&#128266;"; if (!muted) sfx.pop();
@@ -1132,9 +1143,20 @@
       if (tg.setHeaderColor) tg.setHeaderColor("#2b0f4c");
       if (tg.setBackgroundColor) tg.setBackgroundColor("#2b0f4c");
       if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
-      if (tg.BackButton) tg.BackButton.onClick(goHome);
+      if (tg.BackButton) tg.BackButton.onClick(goBack);
     } catch (e) {}
   }
+
+  /* ---------- Live Duel module (js/duel.js) ---------- */
+  var duel = window.RBDuel ? window.RBDuel({
+    CFG: CFG, ANSWERS: ANSWERS, VALID: VALID,
+    G: function () { return G; }, me: function () { return me; }, solo: function () { return solo; },
+    screen: function () { return screen; }, other: other, partnerName: partnerName, hasPartner: hasPartner,
+    patch: patch, notify: notify, toast: toast, bubble: bubble, sfx: sfx, beep: beep, haptic: haptic,
+    confetti: confetti, esc: esc, show: show, goHome: goHome, buildKeyboard: buildKeyboard,
+    scoreGuess: scoreGuess, isBurned: isBurned, viewH: viewH, startSet: startSet,
+    setKeyHandler: function (fn) { activeKeyHandler = fn; }
+  }) : null;
 
   /* ---------- start ---------- */
   function boot() {
