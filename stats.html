@@ -110,7 +110,8 @@
           $("#login").hidden = true; $("#login").classList.remove("active"); $("#dash").classList.add("active");
           var t = o.j.totals, a = o.j.active;
           $("#nNow").textContent = n(a.now); $("#nToday").textContent = n(a.today); $("#nWeek").textContent = n(a.week); $("#nGamesToday").textContent = n(a.gamesToday);
-          $("#nOpened").textContent = n(t.opened); $("#sOpened").textContent = n(t.openedToday) + " opened today · includes solo-only players";
+          if (t.opened == null) { $("#nOpened").textContent = "–"; $("#sOpened").textContent = "couldn't count right now"; }
+          else { $("#nOpened").textContent = n(t.opened); $("#sOpened").textContent = n(t.openedToday) + " opened today · includes solo-only players"; }
           $("#nPlayers").textContent = n(t.players);
           $("#nGames").textContent = n(t.games); $("#sGames").textContent = n(t.paired) + " with two players · " + n(t.waiting) + " waiting";
           $("#nWords").textContent = n(t.words); $("#nDuels").textContent = n(t.duels); $("#nRounds").textContent = n(t.rounds);
