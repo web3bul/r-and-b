@@ -212,17 +212,76 @@
   function show(id) {
     document.querySelectorAll(".screen").forEach(function (s) { s.classList.toggle("active", s.id === id); });
     screen = id;
-    var canBack = id === "score" || id === "setup" || (id === "set" && (G && G.t > 0 || setPurpose === "duel")) || id === "board" || id === "forfeit" || id === "duel" || id === "duelSetup";
+    $("#btnHome").hidden = id === "hub" || id === "loading" || id === "join";
+    var canBack = id === "home" || id === "score" || id === "setup" || (id === "set" && (G && G.t > 0 || setPurpose === "duel")) || id === "board" || id === "forfeit" || id === "duel" || id === "duelSetup";
     $("#btnBack").hidden = !canBack;
     if (tg && tg.BackButton) { try { canBack ? tg.BackButton.show() : tg.BackButton.hide(); } catch (e) {} }
     if (id !== "set" && id !== "board") activeKeyHandler = null;
     if (id !== "board" && clockTimer) pauseClock();
     window.scrollTo(0, 0);
   }
-  function goHome() { renderHome(); show("home"); }
+  // "Home" here is the game you're in: the partner mode picker, or bot practice.
+  function goHome() { if (!G) { showHub(); return; } renderHome(); show("home"); }
   function goBack() {
     if (screen === "duel" && duel && duel.onBack()) return; // stayed in the duel
+    if (screen === "home") { goHub(); return; }
     goHome();
+  }
+
+  /* ---------- HUB: the first page (partner or bot) ---------- */
+  var pendingHome = false;   // open the game's home as soon as it has loaded
+  function showHub() { renderHub(); show("hub"); }
+  function goHub() {
+    if (screen === "duel" && duel && duel.onBack()) return; // stayed in the duel
+    if (solo) exitSolo();
+    pendingHome = false;
+    showHub();
+  }
+  function renderHub() {
+    var name = store.get("myName", (tgUser && tgUser.first_name) || "");
+    document.querySelectorAll(".ptw").forEach(function (x) { x.textContent = CFG.POINTS_TO_WIN; });
+    $("#hubHello").textContent = name ? "Hey " + name + " 👋" : "Hey there 👋";
+    var sub = $("#hubPartnerSub"), badge = $("#hubPartnerBadge"), card = $("#goPartner");
+    var a = $("#hubAvA"), b = $("#hubAvB"), dot = $("#hubDot");
+    var text = "Invite someone special to play", tag = "", online = false;
+    a.firstChild.nodeValue = (name || "?")[0].toUpperCase(); b.firstChild.nodeValue = "?";
+    if (!solo && G) {
+      var p = partnerName(), d = G.duel, f = G.forfeit;
+      a.firstChild.nodeValue = (myName() || "?")[0].toUpperCase();
+      if (!hasPartner()) text = "Waiting for your partner to join · tap to invite";
+      else {
+        b.firstChild.nodeValue = (p || "?")[0].toUpperCase();
+        online = isOnline(other(me));
+        if (d && d.state === "invite" && d.by !== me) { tag = "⚡ Challenge"; text = p + " challenged you to a Live Duel"; }
+        else if (d && (d.state === "countdown" || d.state === "live")) { tag = "⚡ Live"; text = "Your duel with " + p + " is on"; }
+        else if (f && f.state === "pending" && f.w === me) { tag = "😈 Forfeit"; text = "You won! Pick " + p + "'s forfeit"; }
+        else if (f && f.state === "set" && f.l === me) { tag = "😬 Forfeit"; text = "You owe " + p + " a forfeit"; }
+        else if (G.phase === "setting" && G.setter === me) { tag = "Your turn"; text = "Set a word for " + p; }
+        else if (G.phase === "guessing" && guesser() === me) { tag = "Your turn"; text = "Guess " + p + "'s word"; }
+        else if (G.phase === "guessing") text = p + (G.deadline > Date.now() ? " is guessing your word right now" : " has your word to guess");
+        else text = p + " is picking a word for you";
+        text += " · " + G.s[me] + "–" + G.s[other(me)];
+      }
+    } else if (!solo && gameId) text = "Connecting…";
+    sub.textContent = text;
+    badge.hidden = !tag; badge.textContent = tag;
+    card.classList.toggle("hot", !!tag);
+    dot.className = "dot " + (online ? "on" : (!solo && G && hasPartner() ? "off" : ""));
+    // Bot practice: score so far and the bot's level
+    var sd = SoloNet.get(), lvl = BOT_LEVELS[botLevel].label;
+    $("#hubBotSub").textContent = sd && sd.t > 0
+      ? "You " + sd.s[0] + " · Bot " + sd.s[1] + " this round · " + lvl
+      : "Warm up against the R&B Bot · " + lvl;
+  }
+  function openPartner() {
+    if (solo) exitSolo();
+    if (G) { goHome(); return; }
+    if (gameId) { pendingHome = true; toast("Connecting…"); return; } // still loading; opens when ready
+    startSetup();
+  }
+  function openBot() {
+    pendingHome = true;
+    enterSolo(false);
   }
 
   /* ---------- keyboard ---------- */
@@ -267,8 +326,8 @@
   /* ---------- HOME ---------- */
   function renderHome() {
     document.querySelectorAll(".ptw").forEach(function (x) { x.textContent = CFG.POINTS_TO_WIN; });
-    if (!G) { $("#homeEmpty").hidden = false; $("#homeGame").hidden = true; return; }
-    $("#homeEmpty").hidden = true; $("#homeGame").hidden = false;
+    if (!G) return;
+    $("#homeGame").hidden = false;
     var a = me, b = other(me), partner = hasPartner();
 
     $("#nameA").textContent = myName() + " (you)";
@@ -303,12 +362,14 @@
     status.classList.remove("go"); btn.disabled = false; live.hidden = true;
     $("#btnInvite").hidden = partner;
     $("#soloBar").hidden = !solo;
-    $("#btnSolo2").hidden = solo;
+    $("#modeHead").hidden = solo || !partner;
+    $("#btnDuel").hidden = solo;
+    $("#btnNew").textContent = solo ? "Start a fresh game vs the bot" : "Start a brand new game";
 
     if (G.phase === "setting") {
       if (G.setter === me) {
         status.textContent = partner ? "Your turn to set a word ✍️" : "Set the first word ✍️"; status.classList.add("go");
-        title.textContent = "Set a word"; sub.textContent = "for " + (partner ? partnerName() : "your partner");
+        title.textContent = "Set a word"; sub.textContent = "for " + (solo ? "the bot to guess" : partner ? partnerName() : "your partner");
       } else {
         status.textContent = partnerName() + " is picking a word for you… ✍️";
         title.textContent = "Waiting for " + partnerName(); sub.textContent = "You'll get a ping when it's ready";
@@ -317,7 +378,7 @@
     } else { // guessing
       if (guesser() === me) {
         status.textContent = "Your turn to guess! 🎯"; status.classList.add("go");
-        title.textContent = (G.guesses && G.guesses.length ? "Keep guessing" : "Guess " + partnerName() + "'s word");
+        title.textContent = (G.guesses && G.guesses.length ? "Keep guessing" : "Guess " + (solo ? "the bot" : partnerName()) + "'s word");
         sub.textContent = wordLen() + "-letter word · " + (CFG.MAX_GUESSES - (G.guesses || []).length) + " guesses left" + (G.clue ? " · clue inside" : "");
       } else if (!partner) {
         status.textContent = "Word ready. Now invite your partner 💌";
@@ -330,6 +391,17 @@
         renderLive();
       }
     }
+    tileState();
+  }
+  function tileState() {
+    if (!G) return;
+    var go = $("#status").classList.contains("go");
+    $("#btnMain").classList.toggle("hot", go);
+    $("#mainTag").hidden = !go;
+    var d = G.duel, dHot = !solo && d && (d.state === "countdown" || d.state === "live" || (d.state === "invite" && d.by !== me));
+    $("#btnDuel").classList.toggle("hot", !!dHot);
+    $("#duelTag").hidden = !dHot;
+    if (dHot) $("#duelTag").textContent = d.state === "invite" ? "Challenge!" : "Live";
   }
   var liveCount = 0, liveTyped = "";
   function renderLive() {
@@ -399,8 +471,8 @@
   function lostGame() {
     if (unsub) { try { unsub(); } catch (e) {} unsub = null; }
     G = null; gameId = null; store.set("gameId", null);
-    renderHome(); show("home");
     toast("Couldn't open your game. Start a new one 💜");
+    showHub();
   }
   function onUpdate(prev, first) {
     // Partner's taunt
@@ -439,8 +511,10 @@
         toast("✅ " + partnerName() + " says they did the forfeit!"); sfx.ding(); haptic("success");
       }
     }
-    if (first && ["loading", "join", "setup", "home"].indexOf(screen) >= 0) goHome();
+    if (first && pendingHome) { pendingHome = false; goHome(); }
+    else if (first && screen === "loading") showHub();
     else if (screen === "home") renderHome();
+    else if (screen === "hub") renderHub();
     if (first) heartbeat();
     if (solo) botTick();
     if (duel) duel.onUpdate(prev, first);
@@ -451,7 +525,7 @@
     if (!gameId || !uid || document.hidden) return;
     var f = {}; f["seen." + uid] = Date.now(); NET.patch(gameId, f).catch(function () {});
   }
-  setInterval(function () { heartbeat(); if (screen === "home" && G) renderHome(); }, 20000);
+  setInterval(function () { heartbeat(); if (screen === "home" && G) renderHome(); else if (screen === "hub") renderHub(); }, 20000);
   document.addEventListener("visibilitychange", function () {
     if (!gameId || !uid) return;
     if (document.hidden) pauseClock(); else resumeClock();
@@ -545,13 +619,13 @@
     leaveSoloQuietly();
     $("#btnJoin").disabled = true;
     NET.join(joinId, uid, { uid: uid, name: name, tg: tgUser ? tgUser.id : null }, Date.now()).then(function () {
-      G = null; watchGame(joinId);
+      G = null; pendingHome = true; watchGame(joinId);
       setTimeout(function () { notify({ type: "joined" }); }, 1500);
     }).catch(function (e) {
       console.warn(e);
       var code = e && e.code || "";
       toast(code.indexOf("permission") >= 0 ? "That game already has two players" : "That invite doesn't work anymore");
-      if (gameId) watchGame(gameId); else { renderHome(); show("home"); }
+      showHub(); if (gameId) watchGame(gameId);
     }).then(function () { $("#btnJoin").disabled = false; });
   }
 
@@ -1083,14 +1157,13 @@
     solo = true; NET = SoloNet; G = null;
     var d = SoloNet.get();
     if (fresh || !d || d.uids[0] !== uid) { d = newSoloDoc(); SoloNet.create("solo", d); }
-    toast("🤖 Solo mode: you vs the bot");
     watchGame("solo");
   }
   function exitSolo() {
     stopBot();
     if (unsub) { try { unsub(); } catch (e) {} unsub = null; }
     solo = false; NET = ONLINE_NET; G = null; gameId = null;
-    if (onlineId) watchGame(onlineId); else goHome();
+    if (onlineId) watchGame(onlineId);
   }
   function leaveSoloQuietly() {
     store.set("mode", "online");
@@ -1257,14 +1330,13 @@
 
   /* ---------- wiring ---------- */
   function on(id, fn) { $(id).addEventListener("click", fn); }
-  on("#btnStart", startSetup);
   on("#btnNew", function () {
     if (solo) { if (confirm("Start a fresh solo game against the bot?")) enterSolo(true); return; }
     if (confirm("Start a brand new game? You'll need to invite your partner again.")) startSetup();
   });
-  on("#btnSolo1", function () { store.set("mode", "solo"); enterSolo(false); });
-  on("#btnSolo2", function () { store.set("mode", "solo"); enterSolo(false); });
-  on("#btnExitSolo", function () { store.set("mode", "online"); exitSolo(); });
+  on("#goPartner", function () { sfx.pop(); haptic("light"); openPartner(); });
+  on("#goBot", function () { sfx.pop(); haptic("light"); openBot(); });
+  on("#btnHome", function () { sfx.key(); goHub(); });
   on("#btnBotLevel", cycleBotLevel);
   renderBotLevel();
   on("#btnSetupGo", createGame);
@@ -1336,8 +1408,8 @@
         var id2 = cut > 0 ? rest.slice(0, cut) : rest, inviter = cut > 0 ? unb64url(rest.slice(cut + 1)) : "";
         if (id2 && id2 !== gameId) { showJoin(id2, inviter); return; }
       }
-      if (store.get("mode", "online") === "solo") enterSolo(false);
-      else if (gameId) watchGame(gameId); else goHome();
+      showHub();                      // the first page is always the hub
+      if (gameId) watchGame(gameId);  // load the partner game in the background for its status
     }).catch(function (e) {
       console.warn(e);
       $("#loadingMsg").textContent = "Couldn't connect. Check your internet and reopen the game.";
