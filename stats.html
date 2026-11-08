@@ -89,13 +89,23 @@
     function n(x) { return Number(x || 0).toLocaleString(); }
     function showLogin(msg) {
       clearInterval(timer); $("#dash").classList.remove("active"); $("#login").hidden = false; $("#login").classList.add("active");
+      $("#btnGo").disabled = false; $("#btnGo").textContent = "Show stats";
       $("#loginErr").textContent = msg || ""; $("#inKey").value = ""; setTimeout(function () { $("#inKey").focus(); }, 50);
     }
+    // Errors go on whichever screen is showing, so they're never hidden.
+    function fail(msg) {
+      if ($("#dash").classList.contains("active")) { $("#foot").textContent = msg; $("#foot").className = "foot err"; }
+      else { $("#loginErr").textContent = msg; $("#btnGo").disabled = false; $("#btnGo").textContent = "Show stats"; }
+    }
     function load() {
-      fetch("/api/stats", { headers: { "x-stats-key": key } }).then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); })
+      if (!$("#dash").classList.contains("active")) { $("#btnGo").disabled = true; $("#btnGo").textContent = "Checking…"; $("#loginErr").textContent = ""; }
+      fetch("/api/stats", { headers: { "x-stats-key": key } }).then(function (r) {
+          return r.text().then(function (t) { var j; try { j = JSON.parse(t); } catch (e) { j = { ok: false, error: "Server error " + r.status + (t ? ": " + t.slice(0, 160) : "") }; } return { s: r.status, j: j }; });
+        })
         .then(function (o) {
           if (o.s === 401) { try { localStorage.removeItem("rb_stats_key"); } catch (e) {} return showLogin("Wrong password"); }
-          if (!o.j.ok) { $("#foot").textContent = o.j.error || "Something went wrong"; $("#foot").className = "foot err"; return; }
+          if (!o.j.ok) return fail(o.j.error || "Something went wrong (" + o.s + ")");
+          $("#btnGo").disabled = false; $("#btnGo").textContent = "Show stats";
           try { localStorage.setItem("rb_stats_key", key); } catch (e) {}
           $("#login").hidden = true; $("#login").classList.remove("active"); $("#dash").classList.add("active");
           var t = o.j.totals, a = o.j.active;
@@ -110,7 +120,7 @@
           }).join("") : '<p class="muted">No games yet.</p>';
           $("#foot").className = "foot"; $("#foot").textContent = "Updated " + new Date(o.j.at).toLocaleTimeString() + " · refreshes every 30 seconds";
         })
-        .catch(function () { $("#foot").textContent = "Couldn't reach the server"; $("#foot").className = "foot err"; });
+        .catch(function () { fail("Couldn't reach the server. Check your connection."); });
     }
     function start() { clearInterval(timer); load(); timer = setInterval(load, 30000); }
     $("#btnGo").addEventListener("click", function () { key = $("#inKey").value.trim(); if (key) start(); });
