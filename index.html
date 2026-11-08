@@ -16,9 +16,12 @@
   <div class="sparkles" aria-hidden="true"></div>
 
   <header class="topbar">
-    <button class="icon-btn" id="btnBack" aria-label="Back" hidden>&#8592;</button>
+    <div class="tb-left">
+      <button class="icon-btn" id="btnBack" aria-label="Back" hidden>&#8592;</button>
+      <button class="icon-btn" id="btnHome" aria-label="Home" hidden>&#127968;</button>
+    </div>
     <div class="logo">R <span class="amp">&amp;</span> B</div>
-    <button class="icon-btn" id="btnSound" aria-label="Sound on">&#128266;</button>
+    <div class="tb-right"><button class="icon-btn" id="btnSound" aria-label="Sound on">&#128266;</button></div>
   </header>
 
   <main>
@@ -30,25 +33,35 @@
       </div>
     </section>
 
-    <!-- HOME -->
-    <section class="screen" id="home">
-      <div id="homeEmpty" class="card hero">
-        <div class="hero-tiles">
-          <span class="t g">R</span><span class="t y">&amp;</span><span class="t g">B</span>
-        </div>
-        <h1>A word game for two</h1>
-        <p class="muted">Set a secret word of 3 to 5 letters. Your partner gets six guesses. First to <b class="ptw">30</b> points wins the round.</p>
-        <button class="btn primary big" id="btnStart">Play with your partner</button>
-        <button class="btn ghost big" id="btnSolo1">
-          <span class="btn-emoji">&#129302;</span>
-          <span><b>Play solo</b><small>Take on the R&amp;B Bot</small></span>
-        </button>
+    <!-- HUB: the first page -->
+    <section class="screen" id="hub">
+      <div class="hub-hero">
+        <div class="hero-tiles"><span class="t g">R</span><span class="t y">&amp;</span><span class="t g">B</span></div>
+        <h1 id="hubHello">Hey there &#128075;</h1>
+        <p class="muted">Who are we playing with today?</p>
       </div>
+      <button class="choice partner" id="goPartner">
+        <span class="choice-art">
+          <span class="av a" id="hubAvA">?</span><span class="av b" id="hubAvB">?<i class="dot" id="hubDot"></i></span>
+        </span>
+        <span class="choice-body"><b>Play with your partner</b><small id="hubPartnerSub">Invite someone special to play</small></span>
+        <span class="choice-badge" id="hubPartnerBadge" hidden></span>
+        <span class="choice-go" aria-hidden="true">&#8250;</span>
+      </button>
+      <button class="choice bot" id="goBot">
+        <span class="choice-art"><span class="bot-face">&#129302;</span></span>
+        <span class="choice-body"><b>Practice with the bot</b><small id="hubBotSub">Warm up against the R&amp;B Bot</small></span>
+        <span class="choice-go" aria-hidden="true">&#8250;</span>
+      </button>
+      <p class="hub-foot">3 to 5 letter words &middot; six guesses &middot; first to <b class="ptw">30</b> wins</p>
+    </section>
 
+    <!-- HOME: partner game (mode picker) or bot practice -->
+    <section class="screen" id="home">
       <div id="homeGame" hidden>
         <div class="solo-bar" id="soloBar" hidden>
-          <span>&#129302; Solo vs the bot</span>
-          <span class="solo-btns"><button class="btn chip" id="btnBotLevel">&#128578; Normal</button><button class="btn chip" id="btnExitSolo">Exit</button></span>
+          <span>&#129302; Practice vs the bot</span>
+          <span class="solo-btns"><button class="btn chip" id="btnBotLevel">&#128578; Normal</button></span>
         </div>
         <div class="card scorecard">
           <div class="player">
@@ -84,7 +97,28 @@
           <button class="btn primary" id="btnFfAction" hidden></button>
         </div>
 
-        <div class="status-pill" id="status">Your turn!</div>
+        <div class="status-pill" id="status" hidden>Your turn!</div>
+
+        <button class="btn primary big" id="btnInvite" hidden>
+          <span class="btn-emoji">&#128140;</span>
+          <span><b>Invite your partner</b><small>Send this once. After that it's all live.</small></span>
+        </button>
+
+        <div class="mode-head" id="modeHead">Choose a game mode</div>
+        <div class="mode-tiles">
+          <button class="mode-tile turns" id="btnMain">
+            <span class="mt-icon">&#128172;</span>
+            <span class="mt-body"><b id="mainTitle">Take Turns</b><small id="mainSub">Set a word</small></span>
+            <span class="mt-tag" id="mainTag" hidden>Your turn</span>
+            <span class="choice-go" aria-hidden="true">&#8250;</span>
+          </button>
+          <button class="mode-tile duel" id="btnDuel">
+            <span class="mt-icon">&#9889;</span>
+            <span class="mt-body"><b>Live Duel</b><small id="duelSub">Race each other live</small></span>
+            <span class="mt-tag" id="duelTag" hidden>Live</span>
+            <span class="choice-go" aria-hidden="true">&#8250;</span>
+          </button>
+        </div>
 
         <div class="card live-card" id="liveCard" hidden>
           <div class="live-head"><div class="live-title" id="liveTitle">Reye is guessing your word</div><div class="live-timer" id="liveTimer" hidden></div></div>
@@ -101,24 +135,8 @@
 
         <div class="last-line" id="lastLine" hidden></div>
 
-        <button class="btn primary big" id="btnInvite" hidden>
-          <span class="btn-emoji">&#128140;</span>
-          <span><b>Invite your partner</b><small>Send this once. After that it's all live.</small></span>
-        </button>
 
-        <button class="btn primary big" id="btnMain">
-          <span class="btn-emoji">&#128172;</span>
-          <span><b id="mainTitle">Take Turns</b><small id="mainSub">Set a word</small></span>
-        </button>
-        <button class="btn ghost big" id="btnDuel">
-          <span class="btn-emoji">&#9889;</span>
-          <span><b>Live Duel</b><small id="duelSub">Race each other live</small></span>
-        </button>
-
-        <div class="row-btns">
-          <button class="btn soft" id="btnScore">&#127942; Scoreboard</button>
-          <button class="btn soft" id="btnSolo2">&#129302; Play solo</button>
-        </div>
+        <button class="btn soft wide-soft" id="btnScore">&#127942; Scoreboard</button>
         <button class="link-btn" id="btnNew">Start a brand new game</button>
       </div>
     </section>
