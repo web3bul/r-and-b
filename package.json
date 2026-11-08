@@ -13,5 +13,8 @@
   "devDependencies": {
     "esbuild": "0.28.2",
     "firebase": "13.2.0"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

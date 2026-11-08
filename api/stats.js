@@ -33,7 +33,6 @@ module.exports = async (req, res) => {
 
   try {
     const { getFirestore } = require("firebase-admin/firestore");
-    const { getAuth } = require("firebase-admin/auth");
     const db = getFirestore(admin());
     const now = Date.now();
 
@@ -71,25 +70,33 @@ module.exports = async (req, res) => {
     list.sort((a, b) => b.last - a.last);
 
     // Everyone who has ever opened the game (each phone signs in anonymously), including solo-only players.
-    let opened = 0, openedToday = 0, token;
-    const auth = getAuth(admin());
-    do {
-      const page = await auth.listUsers(1000, token);
-      page.users.forEach((u) => {
-        opened++;
-        const t = Date.parse(u.metadata.lastRefreshTime || u.metadata.lastSignInTime || u.metadata.creationTime) || 0;
-        if (now - t < DAY_MS) openedToday++;
-      });
-      token = page.pageToken;
-    } while (token && opened < 50000);
+    // If this part fails, the rest of the stats still load.
+    let opened = null, openedToday = null, token;
+    try {
+      const { getAuth } = require("firebase-admin/auth");
+      const auth = getAuth(admin());
+      opened = 0; openedToday = 0;
+      do {
+        const page = await auth.listUsers(1000, token);
+        page.users.forEach((u) => {
+          opened++;
+          const t = Date.parse(u.metadata.lastRefreshTime || u.metadata.lastSignInTime || u.metadata.creationTime) || 0;
+          if (now - t < DAY_MS) openedToday++;
+        });
+        token = page.pageToken;
+      } while (token && opened < 50000);
+    } catch (e) {
+      opened = null; openedToday = null;
+      console.warn("listUsers failed on Node " + process.version + ": " + (e && e.message));
+    }
 
     return res.status(200).json({
-      ok: true, at: now,
+      ok: true, at: now, node: process.version,
       totals: { opened, openedToday, players: players.size, telegramUsers: tgUsers.size, games, paired, waiting, words, duels, rounds },
       active: { now: nowSet.size, today: daySet.size, week: weekSet.size, gamesToday },
       recent: list.slice(0, 25)
     });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: "Couldn't read Firebase: " + (e && e.message ? e.message : e) });
+    return res.status(500).json({ ok: false, error: "Couldn't read Firebase (Node " + process.version + "): " + (e && e.message ? e.message : e) });
   }
 };
