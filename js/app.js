@@ -6,8 +6,9 @@
 
   var CFG = window.RB_CONFIG;
   var ANSWERS = window.RB_ANSWERS;
+  var RIDDLES = window.RB_RIDDLES || [];
   var VALID = new Set(window.RB_VALID || []);
-  ANSWERS.forEach(function (a) { VALID.add(a.w); });
+  ANSWERS.concat(RIDDLES).forEach(function (a) { VALID.add(a.w); });
   var NET = window.RBNet;
 
   var tg = window.Telegram && window.Telegram.WebApp;
@@ -911,7 +912,11 @@
     if (locked || !G || G.phase !== "guessing" || guesser() !== me) return;
     if (k === "back") { cur = cur.slice(0, -1); sfx.key(); renderBoard(); sendTyping(); return; }
     if (k === "enter") return submitGuess();
-    if (cur.length < wordLen()) { cur += k; sfx.key(); haptic("light"); renderBoard(); sendTyping(); }
+    if (cur.length < wordLen()) {
+      cur += k; sfx.key(); haptic("light"); renderBoard(); sendTyping();
+      // The last letter sends the guess on its own (Enter still works too).
+      if (cur.length === wordLen()) { var typed = cur; setTimeout(function () { if (cur === typed && !locked && screen === "board") submitGuess(); }, 160); }
+    }
   }
   function shakeRow(msg) {
     var rows = document.querySelectorAll("#grid .row"), row = rows[(G.guesses || []).length];
@@ -1191,11 +1196,13 @@
     else if (G.phase === "guessing" && guesser() === BOT_I) { botBusy = true; botLater(botGuess, 1200 + Math.random() * 1200); }
   }
   function botSetWord() {
+    // On Hard the bot sets tougher words, and the clue is a riddle instead of a plain description.
+    var hard = botLevel === "hard" && RIDDLES.length, bank = hard ? RIDDLES : ANSWERS;
     var used = (G.history || []).map(function (h) { return h.w; });
-    var fresh = ANSWERS.filter(function (a) { return used.indexOf(a.w) < 0; });
-    var list = fresh.length ? fresh : ANSWERS;
+    var fresh = bank.filter(function (a) { return used.indexOf(a.w) < 0; });
+    var list = fresh.length ? fresh : bank;
     var pick = list[Math.floor(Math.random() * list.length)];
-    NET.patch("solo", { word: pick.w, clue: pick.c, phase: "guessing", guesses: [], hints: [], deadline: 0, clockLeft: 0, typing: "" })
+    NET.patch("solo", { word: pick.w, clue: (hard ? "🧩 " : "") + pick.c, phase: "guessing", guesses: [], hints: [], deadline: 0, clockLeft: 0, typing: "" })
       .then(function () { botBusy = false; });
   }
   function pool(L) {
@@ -1210,11 +1217,12 @@
   // The bot only ever sees the colours of its own guesses, never your word. To play like a
   // person, it notices each clue only some of the time (a missed yellow, a forgotten grey
   // letter) and only sometimes leans on the everyday-word list. Tuned in testing to solve
-  // about 44% (easy), 68% (normal) and 92% (hard) of everyday words.
+  // about 44% (easy), 68% (normal) and 97% (hard) of everyday words. On Hard it also
+  // sets tougher words with riddle clues (js/riddles.js).
   var BOT_LEVELS = {
     easy:   { g: .75, y: .4,  x: .3,  common: .1, label: "😌 Easy" },
     normal: { g: .9,  y: .6,  x: .5,  common: .2, label: "🙂 Normal" },
-    hard:   { g: 1,   y: .95, x: .85, common: .4, label: "😈 Hard" }
+    hard:   { g: 1,   y: 1,   x: 1,   common: .6, label: "😈 Hard" }
   };
   var botLevel = BOT_LEVELS[store.get("botLevel", "normal")] ? store.get("botLevel", "normal") : "normal";
   function botChoose() {
@@ -1253,7 +1261,7 @@
     botLevel = order[(order.indexOf(botLevel) + 1) % order.length];
     store.set("botLevel", botLevel);
     renderBotLevel();
-    toast("Bot level: " + BOT_LEVELS[botLevel].label);
+    toast("Bot level: " + BOT_LEVELS[botLevel].label + (botLevel === "hard" ? " · riddles + tougher words from the next word" : ""));
   }
   function renderBotLevel() { var b = $("#btnBotLevel"); if (b) b.textContent = BOT_LEVELS[botLevel].label; }
   function botGuess() {

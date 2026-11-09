@@ -297,7 +297,11 @@ window.RBDuel = function (A) {
     var L = myWord(d).length;
     if (key === "back") { cur = cur.slice(0, -1); A.sfx.key(); renderRace(); sendTyping(); return; }
     if (key === "enter") return submit();
-    if (cur.length < L) { cur += key; A.sfx.key(); A.haptic("light"); renderRace(); sendTyping(); }
+    if (cur.length < L) {
+      cur += key; A.sfx.key(); A.haptic("light"); renderRace(); sendTyping();
+      // The last letter sends the guess on its own (Enter still works too).
+      if (cur.length === L) { var typed = cur; setTimeout(function () { if (cur === typed && !locked && live) submit(); }, 160); }
+    }
   }
   function shake(msg) {
     var rows = document.querySelectorAll("#dGrid .row"), d = D(), row = rows[rowsOf(d, me()).length];
