@@ -21,7 +21,7 @@ const html = fs.readFileSync(path.join(root, "index.html"), "utf8")
 fs.writeFileSync(path.join(dist, "index.html"), html);
 fs.copyFileSync(path.join(root, "stats.html"), path.join(dist, "stats.html")); // owner-only stats page (data needs a password)
 fs.copyFileSync(path.join(root, "css/style.css"), path.join(dist, "css/style.css"));
-for (const f of ["app.js", "duel.js", "answers.js", "config.js", "mock.js"]) {
+for (const f of ["app.js", "duel.js", "answers.js", "riddles.js", "config.js", "mock.js"]) {
   fs.copyFileSync(path.join(root, "js", f), path.join(dist, "js", f));
 }
 
@@ -42,6 +42,8 @@ global.window = {};
 eval(fs.readFileSync(path.join(root, "js/answers.js"), "utf8"));
 const all = new Set(words);
 window.RB_ANSWERS.forEach((a) => all.add(a.w));
+eval(fs.readFileSync(path.join(root, "js/riddles.js"), "utf8"));
+window.RB_RIDDLES.forEach((a) => all.add(a.w));
 const list = [...all].sort();
 const out = "// All 3- to 5-letter words accepted as guesses (generated at build time).\nwindow.RB_VALID=\"" + list.join(" ") + "\".split(\" \");\n";
 fs.writeFileSync(path.join(dist, "js/valid.js"), out);
